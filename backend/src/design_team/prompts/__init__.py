@@ -1,0 +1,11 @@
+from .manager import DESIGN_MANAGER_SYSTEM
+from .senior import SENIOR_DESIGNER_SYSTEM
+from .junior import JUNIOR_DESIGNER_SYSTEM
+from .visual import VISUAL_DESIGNER_SYSTEM
+
+__all__ = [
+    "DESIGN_MANAGER_SYSTEM",
+    "SENIOR_DESIGNER_SYSTEM",
+    "JUNIOR_DESIGNER_SYSTEM",
+    "VISUAL_DESIGNER_SYSTEM",
+]

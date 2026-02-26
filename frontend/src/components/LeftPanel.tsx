@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { useStore } from '../store/useStore';
 import { AGENTS } from '../data/agents';
@@ -17,9 +17,18 @@ const PHASE_INDEX: Record<string, number> = {
 };
 
 const LeftPanel: React.FC = () => {
-  const { workflowPhase, agentStates, pendingConfirmation } = useStore();
+  const { workflowPhase, agentStates, pendingConfirmation, sessionId, startSession } = useStore();
   const phaseIdx = PHASE_INDEX[workflowPhase] ?? 0;
   const orchestrator = AGENTS.find((a) => a.isOrchestrator)!;
+  const [brief, setBrief] = useState('');
+  const [launching, setLaunching] = useState(false);
+
+  const handleStart = async () => {
+    if (!brief.trim() || launching) return;
+    setLaunching(true);
+    await startSession(brief.trim());
+    setLaunching(false);
+  };
 
   return (
     <div className="w-[380px] shrink-0 flex flex-col bg-zinc-950 overflow-hidden">
@@ -75,6 +84,33 @@ const LeftPanel: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ── Brief input (shown only before session starts) ── */}
+      {!sessionId && workflowPhase === 'briefing' && (
+        <div className="p-4 border-b border-zinc-800">
+          <p className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-2">
+            Design Brief
+          </p>
+          <textarea
+            value={brief}
+            onChange={(e) => setBrief(e.target.value)}
+            placeholder="Describe the product or UI you want the team to design…"
+            className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 rounded-xl px-3 py-2.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none resize-none transition-colors leading-relaxed"
+            rows={3}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleStart();
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={!brief.trim() || launching}
+            className="mt-2 w-full py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest text-zinc-950 bg-[#7EACEA] hover:bg-[#9DBDEE] disabled:opacity-40 disabled:cursor-default transition-all active:scale-[0.98]"
+          >
+            {launching ? 'Launching…' : 'Start Session ⌘↵'}
+          </button>
+        </div>
+      )}
 
       {/* ── Agent cards + confirmation prompts ── */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2 [scrollbar-width:thin] [scrollbar-color:#3f3f46_transparent]">

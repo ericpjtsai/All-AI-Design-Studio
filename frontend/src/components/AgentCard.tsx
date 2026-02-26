@@ -10,7 +10,9 @@ const STATUS_CONFIG: Record<
   working:   { label: 'Working',   textColor: 'text-blue-400',   dotClass: 'bg-blue-400 animate-pulse' },
   reviewing: { label: 'Reviewing', textColor: 'text-yellow-400', dotClass: 'bg-yellow-400 animate-pulse' },
   waiting:   { label: 'Waiting',   textColor: 'text-orange-400', dotClass: 'bg-orange-400 animate-pulse' },
+  complete:  { label: 'Complete',  textColor: 'text-green-400',  dotClass: 'bg-green-400' },
   done:      { label: 'Done',      textColor: 'text-green-400',  dotClass: 'bg-green-400' },
+  error:     { label: 'Error',     textColor: 'text-red-400',    dotClass: 'bg-red-400' },
 };
 
 interface Props {

@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckSquare, RotateCcw } from 'lucide-react';
-import { ConfirmationPayload } from '../types';
+import { ConfirmationOption, ConfirmationPayload } from '../types';
 import { useStore } from '../store/useStore';
+
+/** Normalise option to its string id — handles both 'confirm' and { id: 'confirm', ... } */
+function optionId(opt: ConfirmationOption): string {
+  return typeof opt === 'string' ? opt : opt.id;
+}
 
 interface Props {
   confirmation: ConfirmationPayload;
@@ -99,7 +104,7 @@ const ConfirmationPrompt: React.FC<Props> = ({ confirmation, agentColor }) => {
 
         {/* Action buttons */}
         <div className="flex gap-2">
-          {confirmation.options.includes('confirm') && (
+          {confirmation.options.some((o) => optionId(o) === 'confirm') && (
             <button
               onClick={handleConfirm}
               disabled={confirmed}
@@ -111,7 +116,7 @@ const ConfirmationPrompt: React.FC<Props> = ({ confirmation, agentColor }) => {
             </button>
           )}
 
-          {confirmation.options.includes('revise') && (
+          {confirmation.options.some((o) => optionId(o) === 'revise') && (
             <button
               onClick={handleRevise}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[11px] font-black uppercase tracking-widest text-zinc-300 transition-all active:scale-[0.98]"

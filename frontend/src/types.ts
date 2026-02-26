@@ -1,4 +1,4 @@
-export type AgentStatus = 'idle' | 'working' | 'reviewing' | 'waiting' | 'done';
+export type AgentStatus = 'idle' | 'working' | 'reviewing' | 'waiting' | 'complete' | 'done' | 'error';
 
 export type WorkflowPhase =
   | 'briefing'
@@ -32,4 +32,7 @@ export interface ConfirmationPayload {
   options: ConfirmationOption[];
 }
 
-export type ConfirmationOption = 'confirm' | 'revise' | 'abort';
+/** Options can be either a simple string key or a rich object from the backend. */
+export type ConfirmationOption =
+  | string
+  | { id: string; label: string; description?: string };

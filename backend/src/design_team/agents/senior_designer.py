@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Awaitable, Callable
 
-import anthropic
+from google import genai
 
 from .base import BaseAgent, EmitFn
 from ..prompts import SENIOR_DESIGNER_SYSTEM
@@ -15,7 +15,7 @@ MilestoneFn = Callable[[str, str], Awaitable[str]]
 
 
 class SeniorDesigner(BaseAgent):
-    def __init__(self, client: anthropic.AsyncAnthropic) -> None:
+    def __init__(self, client: genai.Client) -> None:
         super().__init__(AGENT_INDEX, client)
 
     async def run(
@@ -70,7 +70,7 @@ Return a JSON object:
   }}
 }}
 """
-        flows_raw = await self.call_claude(
+        flows_raw = await self.call_llm(
             system=SENIOR_DESIGNER_SYSTEM,
             user=flows_prompt,
             emit=emit,
@@ -131,7 +131,7 @@ Return a JSON object:
   "handoff_notes": "developer-facing implementation notes"
 }}
 """
-        wireframes_raw = await self.call_claude(
+        wireframes_raw = await self.call_llm(
             system=SENIOR_DESIGNER_SYSTEM,
             user=wireframes_prompt,
             emit=emit,
@@ -225,7 +225,7 @@ Return JSON:
   "overall_assessment": "one paragraph summary"
 }}"""
 
-        raw = await self.call_claude(
+        raw = await self.call_llm(
             system=SENIOR_DESIGNER_SYSTEM,
             user=review_prompt,
             emit=emit,

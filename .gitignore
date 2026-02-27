@@ -7,3 +7,27 @@ coverage/
 .env*
 !.env.example
 remix_-fakeclaw-inc.-3/
+
+# pycache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+*.pyzz
+*.pywzz
+*.pyzzz
+*.pywzzz
+*/__pycache__/
+*/*.pyc
+*/*.pyo
+*/*.pyd
+*/*.pyw
+*/*.pyz
+*/*.pywz
+*/*.pyzz
+*/*.pywzz
+*/*.pyzzz
+*/*.pywzzz

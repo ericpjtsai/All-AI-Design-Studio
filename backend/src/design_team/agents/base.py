@@ -4,14 +4,14 @@ import asyncio
 import time
 from typing import Callable, Awaitable
 
-import anthropic
+from google import genai
 
 from ..api.models import ActivityPayload, AgentUpdatePayload
 
 # Emit callback type: receives event-name + payload dict, puts it on the SSE queue
 EmitFn = Callable[[str, dict], None]
 
-MODEL = "claude-sonnet-4-20250514"
+MODEL = "gemini-3.1-pro-preview"
 
 
 class BaseAgent:
@@ -19,11 +19,11 @@ class BaseAgent:
 
     Each concrete agent subclass gets:
       - its own role index (maps to the frontend AGENTS array)
-      - an AsyncAnthropic client
-      - helper methods: emit_activity(), emit_status(), call_claude()
+      - a Gemini client
+      - helper methods: emit_activity(), emit_status(), call_llm()
     """
 
-    def __init__(self, role_index: int, client: anthropic.AsyncAnthropic) -> None:
+    def __init__(self, role_index: int, client: genai.Client) -> None:
         self.role_index = role_index
         self.client = client
 
@@ -59,9 +59,9 @@ class BaseAgent:
         )
         emit("agent_update", payload.model_dump())
 
-    # ── Claude call ─────────────────────────────────────────────────────────
+    # ── LLM call ────────────────────────────────────────────────────────────
 
-    async def call_claude(
+    async def call_llm(
         self,
         system: str,
         user: str,
@@ -69,28 +69,28 @@ class BaseAgent:
         activity_prefix: str = "Thinking",
         max_tokens: int = 8096,
     ) -> str:
-        """Stream a Claude response, emitting activity dots while streaming.
+        """Stream a Gemini response, emitting activity dots while streaming.
 
         Returns the full response text.
         """
         full_text = ""
-        chunk_count = 0
         last_activity_at = time.monotonic()
 
-        async with self.client.messages.stream(
+        async for chunk in await self.client.aio.models.generate_content_stream(
             model=MODEL,
-            max_tokens=max_tokens,
-            system=system,
-            messages=[{"role": "user", "content": user}],
-        ) as stream:
-            async for text in stream.text_stream:
-                full_text += text
-                chunk_count += 1
+            contents=user,
+            config=genai.types.GenerateContentConfig(
+                system_instruction=system,
+                max_output_tokens=max_tokens,
+            ),
+        ):
+            if chunk.text:
+                full_text += chunk.text
 
-                # Emit a brief activity pulse every ~20 chunks to show liveness
-                now = time.monotonic()
-                if now - last_activity_at > 1.5:
-                    self.emit_activity(emit, f"{activity_prefix}…", "info")
-                    last_activity_at = now
+            # Emit a brief activity pulse every ~1.5 s to show liveness
+            now = time.monotonic()
+            if now - last_activity_at > 1.5:
+                self.emit_activity(emit, f"{activity_prefix}…", "info")
+                last_activity_at = now
 
         return full_text.strip()

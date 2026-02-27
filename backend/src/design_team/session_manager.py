@@ -38,7 +38,9 @@ import uuid
 from dataclasses import dataclass, field
 from typing import AsyncGenerator
 
-import anthropic
+import os
+
+from google import genai
 
 from .agents import DesignManager, SeniorDesigner, VisualDesigner, JuniorDesigner
 from .api.models import ConfirmationOption, ConfirmationPromptPayload
@@ -84,7 +86,7 @@ class SessionData:
 class SessionManager:
     def __init__(self) -> None:
         self._sessions: dict[str, SessionData] = {}
-        self._client = anthropic.AsyncAnthropic()
+        self._client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
         # Agents are stateless — safe to share across sessions
         self._manager = DesignManager(self._client)
         self._senior = SeniorDesigner(self._client)

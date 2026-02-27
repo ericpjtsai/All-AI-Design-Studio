@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore';
 import { AGENTS } from '../data/agents';
 
 const ActivityFeed: React.FC = () => {
-  const { activities } = useStore();
+  const activities = useStore((s) => s.activities);
 
   return (
     <div className="p-4">

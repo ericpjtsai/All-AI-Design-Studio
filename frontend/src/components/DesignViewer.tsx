@@ -66,12 +66,10 @@ const ColorSwatch: React.FC<{ name: string; value: string }> = ({ name, value })
 // ── Main component ────────────────────────────────────────────────────────────
 
 export const DesignViewer: React.FC = () => {
-  const { sessionId, workflowPhase, designOutputs, setDesignOutputs } = useStore((s) => ({
-    sessionId: s.sessionId,
-    workflowPhase: s.workflowPhase,
-    designOutputs: s.designOutputs,
-    setDesignOutputs: s.setDesignOutputs,
-  }));
+  const sessionId = useStore((s) => s.sessionId);
+  const workflowPhase = useStore((s) => s.workflowPhase);
+  const designOutputs = useStore((s) => s.designOutputs);
+  const setDesignOutputs = useStore((s) => s.setDesignOutputs);
 
   const [protoFullscreen, setProtoFullscreen] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);

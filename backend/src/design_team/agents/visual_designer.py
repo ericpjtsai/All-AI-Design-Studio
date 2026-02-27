@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Awaitable, Callable
 
-import anthropic
+from google import genai
 
 from .base import BaseAgent, EmitFn
 from ..prompts import VISUAL_DESIGNER_SYSTEM
@@ -14,7 +14,7 @@ MilestoneFn = Callable[[str, str], Awaitable[str]]
 
 
 class VisualDesigner(BaseAgent):
-    def __init__(self, client: anthropic.AsyncAnthropic) -> None:
+    def __init__(self, client: genai.Client) -> None:
         super().__init__(AGENT_INDEX, client)
 
     async def run(
@@ -66,7 +66,7 @@ Return a JSON object with these keys:
   }}
 }}
 """
-        core_raw = await self.call_claude(
+        core_raw = await self.call_llm(
             system=VISUAL_DESIGNER_SYSTEM,
             user=core_prompt,
             emit=emit,
@@ -139,7 +139,7 @@ Return a JSON object:
   }}
 }}
 """
-        specs_raw = await self.call_claude(
+        specs_raw = await self.call_llm(
             system=VISUAL_DESIGNER_SYSTEM,
             user=specs_prompt,
             emit=emit,

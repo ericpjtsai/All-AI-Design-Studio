@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-import anthropic
+from google import genai
 
 from .base import BaseAgent, EmitFn
 from ..prompts import DESIGN_MANAGER_SYSTEM
@@ -12,7 +12,7 @@ AGENT_INDEX = 0
 
 
 class DesignManager(BaseAgent):
-    def __init__(self, client: anthropic.AsyncAnthropic) -> None:
+    def __init__(self, client: genai.Client) -> None:
         super().__init__(AGENT_INDEX, client)
 
     # ── Phase 0: brief analysis → scope document ─────────────────────────────
@@ -42,7 +42,7 @@ Return a JSON object with exactly these keys:
 
 If the brief is detailed enough, set clarifying_questions to an empty array.
 """
-        raw = await self.call_claude(
+        raw = await self.call_llm(
             system=DESIGN_MANAGER_SYSTEM,
             user=user_prompt,
             emit=emit,
@@ -97,7 +97,7 @@ Return a JSON object:
   "kickoff_summary": "2-sentence briefing message to the team"
 }}
 """
-        raw = await self.call_claude(
+        raw = await self.call_llm(
             system=DESIGN_MANAGER_SYSTEM,
             user=user_prompt,
             emit=emit,
@@ -154,7 +154,7 @@ Return a JSON object:
         self.emit_status(emit, "working", "Drafting skill-evolution directives…", 0.4)
         self.emit_activity(emit, "Identifying risk areas and preparing review criteria…")
 
-        raw = await self.call_claude(
+        raw = await self.call_llm(
             system=DESIGN_MANAGER_SYSTEM,
             user=user_prompt,
             emit=emit,
@@ -216,7 +216,7 @@ Return a JSON object (keep feedback ≤ 2 sentences):
 
 Only set needs_human=true for genuine quality risks or scope deviations that require human judgment.
 """
-        raw = await self.call_claude(
+        raw = await self.call_llm(
             system=DESIGN_MANAGER_SYSTEM,
             user=user_prompt,
             emit=emit,
@@ -284,7 +284,7 @@ Return a JSON object:
   "summary": "1-sentence summary of the cross-critique outcome"
 }}
 """
-        raw = await self.call_claude(
+        raw = await self.call_llm(
             system=DESIGN_MANAGER_SYSTEM,
             user=user_prompt,
             emit=emit,
@@ -385,7 +385,7 @@ Apply the prepared criteria and the Senior Designer's implementation review. Ret
   "summary": "2-3 sentence narrative"
 }}
 """
-        raw = await self.call_claude(
+        raw = await self.call_llm(
             system=DESIGN_MANAGER_SYSTEM,
             user=user_prompt,
             emit=emit,

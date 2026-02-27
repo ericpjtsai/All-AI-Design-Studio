@@ -17,16 +17,14 @@ const PHASE_INDEX: Record<string, number> = {
 };
 
 const LeftPanel: React.FC = () => {
-  const {
-    workflowPhase,
-    pendingConfirmation,
-    sessionId,
-    sessionError,
-    agentTrust,
-    startSession,
-    resetSession,
-    setAgentTrust,
-  } = useStore();
+  const workflowPhase = useStore((s) => s.workflowPhase);
+  const pendingConfirmation = useStore((s) => s.pendingConfirmation);
+  const sessionId = useStore((s) => s.sessionId);
+  const sessionError = useStore((s) => s.sessionError);
+  const agentTrust = useStore((s) => s.agentTrust);
+  const startSession = useStore((s) => s.startSession);
+  const resetSession = useStore((s) => s.resetSession);
+  const setAgentTrust = useStore((s) => s.setAgentTrust);
 
   const orchestrator = AGENTS.find((a) => a.isOrchestrator)!;
   const phaseIdx = PHASE_INDEX[workflowPhase] ?? 0;

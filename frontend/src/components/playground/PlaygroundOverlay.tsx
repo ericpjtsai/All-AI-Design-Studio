@@ -90,7 +90,7 @@ const PlaygroundOverlay: React.FC<PlaygroundOverlayProps> = ({ onExit }) => {
           <div className="w-2 h-8 bg-[#7EACEA] rounded-full shrink-0 mt-0.5" />
           <div>
             <h1 className="text-lg font-black text-zinc-900 tracking-tight leading-tight">Avatar Playground</h1>
-            <p className="text-[11px] text-zinc-400 font-medium leading-snug">Three.js WebGPU · 4 agents · {performance.fps} fps</p>
+            <p className="text-[11px] text-zinc-400 font-medium leading-snug">Three.js WebGPU · 5 agents · {performance.fps} fps</p>
           </div>
         </div>
 

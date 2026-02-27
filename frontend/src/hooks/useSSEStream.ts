@@ -17,6 +17,7 @@ export function useSSEStream(sessionId: string | null): void {
     _setPhase,
     _setPendingConfirmation,
     _setComplete,
+    _setSessionError,
   } = useStore();
 
   useEffect(() => {
@@ -53,12 +54,12 @@ export function useSSEStream(sessionId: string | null): void {
 
     es.addEventListener('session_error', (e: MessageEvent) => {
       const { message } = JSON.parse(e.data);
-      console.error('[SSE] session_error:', message);
+      _setSessionError(message);
       es.close();
     });
 
     es.onerror = () => {
-      console.warn('[SSE] connection error — closing');
+      _setSessionError('Lost connection to backend. Is it running on port 8000?');
       es.close();
     };
 

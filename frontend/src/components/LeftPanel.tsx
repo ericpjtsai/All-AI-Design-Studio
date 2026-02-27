@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { useStore } from '../store/useStore';
 import { AGENTS } from '../data/agents';
-import AgentCard from './AgentCard';
+import AgentGraph from './AgentGraph';
 import ConfirmationPrompt from './ConfirmationPrompt';
 import ActivityFeed from './ActivityFeed';
 
@@ -17,9 +17,19 @@ const PHASE_INDEX: Record<string, number> = {
 };
 
 const LeftPanel: React.FC = () => {
-  const { workflowPhase, agentStates, pendingConfirmation, sessionId, startSession } = useStore();
-  const phaseIdx = PHASE_INDEX[workflowPhase] ?? 0;
+  const {
+    workflowPhase,
+    pendingConfirmation,
+    sessionId,
+    sessionError,
+    agentTrust,
+    startSession,
+    resetSession,
+    setAgentTrust,
+  } = useStore();
+
   const orchestrator = AGENTS.find((a) => a.isOrchestrator)!;
+  const phaseIdx = PHASE_INDEX[workflowPhase] ?? 0;
   const [brief, setBrief] = useState('');
   const [launching, setLaunching] = useState(false);
 
@@ -33,7 +43,7 @@ const LeftPanel: React.FC = () => {
   return (
     <div className="w-[380px] shrink-0 flex flex-col bg-zinc-950 overflow-hidden">
       {/* ── Header ── */}
-      <div className="p-5 border-b border-zinc-800">
+      <div className="p-5 border-b border-zinc-800 shrink-0">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-2 h-8 rounded-full bg-[#7EACEA]" />
           <div>
@@ -62,9 +72,7 @@ const LeftPanel: React.FC = () => {
               <div
                 key={i}
                 className="h-1 rounded-full flex-1 transition-all duration-500"
-                style={{
-                  backgroundColor: i <= phaseIdx ? '#7EACEA' : '#27272a',
-                }}
+                style={{ backgroundColor: i <= phaseIdx ? '#7EACEA' : '#27272a' }}
               />
             ))}
           </div>
@@ -74,8 +82,7 @@ const LeftPanel: React.FC = () => {
                 key={label}
                 className="text-[9px] font-bold uppercase tracking-wider"
                 style={{
-                  color:
-                    i === phaseIdx ? '#7EACEA' : i < phaseIdx ? '#52525b' : '#3f3f46',
+                  color: i === phaseIdx ? '#7EACEA' : i < phaseIdx ? '#52525b' : '#3f3f46',
                 }}
               >
                 {label}
@@ -85,9 +92,26 @@ const LeftPanel: React.FC = () => {
         </div>
       </div>
 
+      {/* ── Error banner ── */}
+      {sessionError && (
+        <div className="mx-4 mt-3 p-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-2.5 shrink-0">
+          <span className="text-red-400 text-base leading-none mt-0.5">⚠</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-red-400 text-[11px] font-semibold leading-snug">{sessionError}</p>
+          </div>
+          <button
+            type="button"
+            onClick={resetSession}
+            className="shrink-0 text-[10px] font-black uppercase tracking-wider text-red-400 hover:text-red-300 transition-colors"
+          >
+            Reset
+          </button>
+        </div>
+      )}
+
       {/* ── Brief input (shown only before session starts) ── */}
       {!sessionId && workflowPhase === 'briefing' && (
-        <div className="p-4 border-b border-zinc-800">
+        <div className="p-4 border-b border-zinc-800 shrink-0">
           <p className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-2">
             Design Brief
           </p>
@@ -112,33 +136,76 @@ const LeftPanel: React.FC = () => {
         </div>
       )}
 
-      {/* ── Agent cards + confirmation prompts ── */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2 [scrollbar-width:thin] [scrollbar-color:#3f3f46_transparent]">
-        {AGENTS.map((agent) => {
-          const runtimeState = agentStates.find((a) => a.index === agent.index)!;
-          const showConfirmation =
-            agent.isOrchestrator && pendingConfirmation !== null;
-
-          return (
-            <div key={agent.index}>
-              <AgentCard agent={agent} runtimeState={runtimeState} />
-
-              {/* Confirmation prompt sits directly under the Design Manager card */}
-              <AnimatePresence>
-                {showConfirmation && (
-                  <ConfirmationPrompt
-                    confirmation={pendingConfirmation!}
-                    agentColor={orchestrator.color}
-                  />
-                )}
-              </AnimatePresence>
-            </div>
-          );
-        })}
+      {/* ── Agent interaction graph ── */}
+      <div className="border-b border-zinc-800 shrink-0">
+        <AgentGraph />
       </div>
 
-      {/* ── Activity feed ── */}
-      <div className="border-t border-zinc-800">
+      {/* ── Trust levels ── */}
+      <div className="px-4 py-3 border-b border-zinc-800 shrink-0">
+        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mb-2.5">
+          Trust Levels
+        </p>
+        <div className="space-y-2">
+          {AGENTS.map((agent) => {
+            const pct = Math.round(agentTrust[agent.index] * 100);
+            return (
+              <div key={agent.index} className="flex items-center gap-2">
+                {/* Color dot */}
+                <div
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: agent.color }}
+                />
+                {/* Name */}
+                <span className="text-[10px] text-zinc-400 w-[90px] shrink-0 truncate">
+                  {agent.role.replace(' Designer', '').replace(' Manager', ' Mgr')}
+                </span>
+                {/* Slider */}
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={pct}
+                  disabled={!!sessionId}
+                  aria-label={`${agent.role} trust level: ${pct}%`}
+                  title={`${agent.role} trust level`}
+                  onChange={(e) => setAgentTrust(agent.index, Number(e.target.value) / 100)}
+                  className="flex-1 h-1 rounded-full appearance-none cursor-pointer disabled:cursor-default disabled:opacity-50"
+                  style={{
+                    background: `linear-gradient(to right, ${agent.color} 0%, ${agent.color} ${pct}%, #27272a ${pct}%, #27272a 100%)`,
+                    accentColor: agent.color,
+                  }}
+                />
+                {/* Percentage */}
+                <span
+                  className="text-[10px] font-bold tabular-nums w-7 text-right shrink-0"
+                  style={{ color: pct >= 70 ? agent.color : '#52525b' }}
+                >
+                  {pct}%
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        {sessionId && (
+          <p className="text-[9px] text-zinc-600 mt-1.5">Trust levels locked during session.</p>
+        )}
+      </div>
+
+      {/* ── Confirmation prompt (when pending) ── */}
+      <div className="px-4 shrink-0">
+        <AnimatePresence>
+          {pendingConfirmation && (
+            <ConfirmationPrompt
+              confirmation={pendingConfirmation}
+              agentColor={orchestrator.color}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ── Activity feed (compact latest entries) ── */}
+      <div className="flex-1 overflow-hidden border-t border-zinc-800 min-h-0">
         <ActivityFeed />
       </div>
     </div>

@@ -12,13 +12,13 @@ const App: React.FC = () => {
 
   return (
     <div className="flex w-screen h-screen bg-zinc-950 overflow-hidden">
-      {/* Left panel — team collaboration status */}
+      {/* Left panel — agent graph, trust controls, brief input, confirmations */}
       <LeftPanel />
 
       {/* Panel divider */}
       <div className="w-px bg-zinc-800 shrink-0" />
 
-      {/* Right panel — 3D agent interaction graph */}
+      {/* Right panel — design outputs and activity log */}
       <RightPanel />
     </div>
   );

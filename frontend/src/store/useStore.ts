@@ -20,9 +20,22 @@ function makeActivity(
     id: String(++_activityId),
     agentIndex,
     message,
-    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     level,
   };
+}
+
+// ── Design output types ────────────────────────────────────────────────────────
+
+export interface DesignOutputs {
+  scope_doc: Record<string, unknown>;
+  direction_brief: Record<string, unknown>;
+  senior_output: Record<string, unknown>;
+  visual_output: Record<string, unknown>;
+  junior_output: Record<string, unknown>;
+  cross_critique: Record<string, unknown>;
+  senior_impl_review: Record<string, unknown>;
+  review: Record<string, unknown>;
 }
 
 // ── Initial state ─────────────────────────────────────────────────────────────
@@ -43,16 +56,21 @@ interface StudioStore {
   activities: ActivityEntry[];
   pendingConfirmation: ConfirmationPayload | null;
   workflowPhase: WorkflowPhase;
-  graphVisible: boolean;
-  graphNodeScreenPositions: Array<{ x: number; y: number } | null>;
   /** null = demo mode (no backend), string = live session id */
   sessionId: string | null;
+  /** Non-null when the session or connection has errored */
+  sessionError: string | null;
+  /** Per-agent trust levels (0.0–1.0). Index maps to AGENTS array. */
+  agentTrust: number[];
+  /** Latest design outputs fetched from backend */
+  designOutputs: DesignOutputs | null;
 
   // Public actions
   startSession: (brief: string) => Promise<void>;
+  resetSession: () => void;
   confirmDecision: (id: string, action: 'confirm' | 'revise', feedback?: string) => void;
-  toggleGraph: () => void;
-  setGraphNodeScreenPositions: (pos: Array<{ x: number; y: number } | null>) => void;
+  setAgentTrust: (index: number, value: number) => void;
+  setDesignOutputs: (outputs: DesignOutputs) => void;
 
   // Internal actions — also called by useSSEStream
   _updateAgent: (payload: { agentIndex: number } & Partial<AgentRuntimeState>) => void;
@@ -60,6 +78,7 @@ interface StudioStore {
   _setPhase: (phase: WorkflowPhase) => void;
   _setPendingConfirmation: (payload: ConfirmationPayload | null) => void;
   _setComplete: () => void;
+  _setSessionError: (message: string) => void;
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -69,15 +88,21 @@ export const useStore = create<StudioStore>()((set, get) => ({
   activities: [],
   pendingConfirmation: null,
   workflowPhase: 'briefing',
-  graphVisible: true,
-  graphNodeScreenPositions: [null, null, null, null],
   sessionId: null,
+  sessionError: null,
+  agentTrust: [0.5, 0.5, 0.5, 0.5],
+  designOutputs: null,
 
   // ── UI helpers ─────────────────────────────────────────────────────────────
 
-  toggleGraph: () => set((s) => ({ graphVisible: !s.graphVisible })),
+  setAgentTrust: (index, value) =>
+    set((s) => {
+      const next = [...s.agentTrust];
+      next[index] = value;
+      return { agentTrust: next };
+    }),
 
-  setGraphNodeScreenPositions: (pos) => set({ graphNodeScreenPositions: pos }),
+  setDesignOutputs: (outputs) => set({ designOutputs: outputs }),
 
   // ── SSE-compatible internal setters ───────────────────────────────────────
 
@@ -90,7 +115,8 @@ export const useStore = create<StudioStore>()((set, get) => ({
 
   _addActivity: ({ agentIndex, message, level = 'info' }) =>
     set((s) => ({
-      activities: [makeActivity(agentIndex, message, level), ...s.activities].slice(0, 60),
+      // Keep up to 500 entries (no silent truncation during a session)
+      activities: [makeActivity(agentIndex, message, level), ...s.activities].slice(0, 500),
     })),
 
   _setPhase: (phase) => set({ workflowPhase: phase }),
@@ -105,14 +131,45 @@ export const useStore = create<StudioStore>()((set, get) => ({
     );
   },
 
+  _setSessionError: (message) => {
+    set((s) => ({
+      sessionError: message,
+      activities: [
+        makeActivity(0, `Error: ${message}`, 'warn'),
+        ...s.activities,
+      ].slice(0, 500),
+    }));
+    AGENTS.forEach((a) => {
+      if (get().agentStates.find((s) => s.index === a.index)?.status !== 'idle') {
+        get()._updateAgent({ agentIndex: a.index, status: 'error', isActive: false });
+      }
+    });
+  },
+
+  resetSession: () =>
+    set({
+      sessionId: null,
+      sessionError: null,
+      workflowPhase: 'briefing',
+      activities: [],
+      pendingConfirmation: null,
+      agentStates: initialAgentStates,
+      designOutputs: null,
+    }),
+
   // ── startSession — POST /api/sessions to kick off real backend ─────────────
 
   startSession: async (brief: string) => {
+    const { agentTrust } = get();
+    // Convert array to indexed dict expected by backend
+    const agent_trust: Record<number, number> = {};
+    agentTrust.forEach((v, i) => { agent_trust[i] = v; });
+
     try {
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brief }),
+        body: JSON.stringify({ brief, agent_trust }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const { session_id } = await res.json();
@@ -121,6 +178,7 @@ export const useStore = create<StudioStore>()((set, get) => ({
         workflowPhase: 'scoping',
         activities: [],
         pendingConfirmation: null,
+        designOutputs: null,
         agentStates: initialAgentStates.map((a) =>
           a.index === 0
             ? { ...a, status: 'working', currentTask: 'Analyzing design brief…', progress: 5 }
@@ -129,7 +187,10 @@ export const useStore = create<StudioStore>()((set, get) => ({
       });
       get()._addActivity({ agentIndex: 0, message: 'Session started. Analyzing brief…' });
     } catch (err) {
-      console.error('[startSession]', err);
+      const msg = err instanceof TypeError && String(err).includes('fetch')
+        ? 'Cannot reach backend — is it running on port 8000?'
+        : `Failed to start session: ${String(err)}`;
+      set({ sessionError: msg });
     }
   },
 
@@ -242,24 +303,31 @@ export const useStore = create<StudioStore>()((set, get) => ({
 
       setTimeout(() => {
         _updateAgent({ agentIndex: 2, status: 'complete', progress: 100, currentTask: '4 components delivered', isActive: false });
-        _updateAgent({ agentIndex: 0, status: 'reviewing', currentTask: 'Running final quality gate…' });
+        _updateAgent({ agentIndex: 1, status: 'reviewing', currentTask: 'Reviewing Junior & Visual implementation…', isActive: true });
         _addActivity({ agentIndex: 2, message: '4 React components delivered.', level: 'success' });
-        _addActivity({ agentIndex: 0, message: 'Running final quality gate.' });
+        _addActivity({ agentIndex: 1, message: 'Auditing component implementation against wireframes…' });
 
         setTimeout(() => {
-          set({
-            workflowPhase: 'reviewing',
-            pendingConfirmation: {
-              id: 'final-review',
-              title: 'Final Deliverables — Checkpoint 3',
-              question: 'All deliverables complete. 4 React components, 34 tokens, Figma specs, handoff docs. Ready for final approval.',
-              context:
-                'Deliverables:\n✓ 4 React components (TypeScript)\n✓ 34 design tokens\n✓ Figma specs (JSON)\n✓ Handoff notes\n\nOverall score: 8.6/10',
-              options: ['confirm', 'revise'],
-            },
-          });
-          _updateAgent({ agentIndex: 0, status: 'reviewing', currentTask: 'Awaiting final approval' });
-        }, 1500);
+          _updateAgent({ agentIndex: 1, status: 'complete', currentTask: 'Implementation review complete', isActive: false });
+          _updateAgent({ agentIndex: 0, status: 'reviewing', currentTask: 'Running final quality gate…' });
+          _addActivity({ agentIndex: 1, message: 'Implementation review: UX adherence 8/10 · Token usage 9/10.', level: 'success' });
+          _addActivity({ agentIndex: 0, message: 'Running final quality gate.' });
+
+          setTimeout(() => {
+            set({
+              workflowPhase: 'reviewing',
+              pendingConfirmation: {
+                id: 'final-review',
+                title: 'Final Deliverables — Checkpoint 3',
+                question: 'All deliverables complete. 4 React components, 34 tokens, Figma specs, handoff docs. Ready for final approval.',
+                context:
+                  'Deliverables:\n✓ 4 React components (TypeScript)\n✓ 34 design tokens\n✓ Figma specs (JSON)\n✓ Handoff notes\n\nOverall score: 8.6/10',
+                options: ['confirm', 'revise'],
+              },
+            });
+            _updateAgent({ agentIndex: 0, status: 'reviewing', currentTask: 'Awaiting final approval' });
+          }, 1500);
+        }, 3000);
       }, 13000);
 
     } else if (workflowPhase === 'reviewing') {

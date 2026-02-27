@@ -57,6 +57,7 @@ class SSEEvent(BaseModel):
 
 class StartSessionRequest(BaseModel):
     brief: str
+    agent_trust: dict[int, float] = {}
 
 
 class StartSessionResponse(BaseModel):

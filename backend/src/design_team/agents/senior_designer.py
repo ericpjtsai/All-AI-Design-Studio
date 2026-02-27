@@ -166,3 +166,96 @@ Return a JSON object:
         self.emit_activity(emit, "Flows, IA, wireframes, and interaction specs delivered.", "success")
 
         return combined
+
+    async def review_implementation(
+        self,
+        junior_output: dict,
+        visual_output: dict,
+        scope_doc: dict,
+        emit: EmitFn,
+    ) -> dict:
+        """Review Junior's component implementation and Visual's token usage.
+
+        Called in Phase 2b before the Manager's final review.
+        Returns a structured assessment of UX adherence and token correctness.
+        """
+        self.emit_status(emit, "reviewing", "Reviewing Junior & Visual implementation", 0.1)
+        self.emit_activity(emit, "Auditing component implementation against wireframes…")
+
+        components = junior_output.get("components", [])
+        comp_summary = [
+            {"name": c.get("name", ""), "code_snippet": c.get("tsx_code", "")[:300]}
+            for c in components[:4]
+        ]
+        token_keys = list((visual_output.get("design_tokens") or {}).keys())
+        component_styles_keys = list((visual_output.get("component_styles") or {}).keys())
+
+        review_prompt = f"""You are a Senior Designer reviewing the Junior Designer's React implementation
+and the Visual Designer's token usage. Your job is to check UX adherence and design system correctness.
+
+SCOPE DOCUMENT (what was agreed):
+{json.dumps(scope_doc, indent=2)}
+
+JUNIOR DESIGNER'S COMPONENTS (first 4):
+{json.dumps(comp_summary, indent=2)}
+
+VISUAL DESIGNER'S TOKEN CATEGORIES:
+{json.dumps(token_keys, indent=2)}
+
+COMPONENT STYLES DEFINED:
+{json.dumps(component_styles_keys, indent=2)}
+
+IMPLEMENTATION NOTES FROM JUNIOR:
+{junior_output.get("implementation_notes", "")[:400]}
+
+Review for:
+1. UX adherence — do components match the wireframe intent and interaction specs?
+2. Token usage — are design tokens applied (no hardcoded color/spacing values visible)?
+3. Completeness — are all expected components present?
+4. Quality highlights — what was done well?
+5. Issues — specific problems that need attention.
+
+Return JSON:
+{{
+  "ux_adherence_score": 8,
+  "token_usage_score": 7,
+  "component_issues": ["issue 1", "issue 2"],
+  "positive_highlights": ["highlight 1"],
+  "recommendations": ["recommendation 1"],
+  "overall_assessment": "one paragraph summary"
+}}"""
+
+        raw = await self.call_claude(
+            system=SENIOR_DESIGNER_SYSTEM,
+            user=review_prompt,
+            emit=emit,
+            activity_prefix="Reviewing implementation",
+            max_tokens=1024,
+        )
+
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError:
+            result = {
+                "ux_adherence_score": None,
+                "token_usage_score": None,
+                "component_issues": [],
+                "positive_highlights": [],
+                "recommendations": [],
+                "overall_assessment": raw[:400],
+            }
+
+        ux_score = result.get("ux_adherence_score", "N/A")
+        token_score = result.get("token_usage_score", "N/A")
+        self.emit_activity(
+            emit,
+            f"Implementation review: UX adherence {ux_score}/10 · Token usage {token_score}/10.",
+            "success" if (ux_score or 0) >= 7 else "warn",
+        )
+
+        issues = result.get("component_issues", [])
+        if issues:
+            self.emit_activity(emit, f"Issues found: {'; '.join(issues[:2])}", "warn")
+
+        self.emit_status(emit, "complete", "Implementation review complete", 1.0, False)
+        return result

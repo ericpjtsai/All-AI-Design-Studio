@@ -65,6 +65,8 @@ class SessionData:
     status: str = "running"   # running | awaiting_confirm | complete | error
     confidence: float = CONFIDENCE_INIT
     milestone_flags: list[dict] = field(default_factory=list)
+    # Per-agent trust settings (0.0–1.0). Keys: 0=Manager,1=Senior,2=Junior,3=Visual
+    agent_trust: dict = field(default_factory=dict)
     # Final outputs
     scope_doc: dict = field(default_factory=dict)
     direction_brief: dict = field(default_factory=dict)
@@ -73,6 +75,7 @@ class SessionData:
     junior_output: dict = field(default_factory=dict)
     optimization_prep: dict = field(default_factory=dict)
     cross_critique_result: dict = field(default_factory=dict)
+    senior_impl_review: dict = field(default_factory=dict)
     review: dict = field(default_factory=dict)
 
 
@@ -90,11 +93,16 @@ class SessionManager:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    async def create_session(self, brief: str) -> str:
+    async def create_session(self, brief: str, agent_trust: dict | None = None) -> str:
         session_id = str(uuid.uuid4())[:8]
-        data = SessionData(session_id=session_id, brief=brief)
+        # Convert string keys from JSON to int keys
+        trust = {}
+        if agent_trust:
+            for k, v in agent_trust.items():
+                trust[int(k)] = float(v)
+        data = SessionData(session_id=session_id, brief=brief, agent_trust=trust)
         self._sessions[session_id] = data
-        data.task = asyncio.get_event_loop().create_task(self._run_workflow(data))
+        data.task = asyncio.create_task(self._run_workflow(data))
         return session_id
 
     async def confirm(self, session_id: str, action: str, feedback: str | None = None) -> bool:
@@ -139,6 +147,7 @@ class SessionManager:
             "junior_output": data.junior_output,
             "optimization_prep": data.optimization_prep,
             "cross_critique": data.cross_critique_result,
+            "senior_impl_review": data.senior_impl_review,
             "review": data.review,
         }
 
@@ -202,6 +211,18 @@ class SessionManager:
                 "level": "warn",
             })
 
+    def _effective_threshold(self, data: SessionData) -> float:
+        """Compute the adaptive self-approve threshold from Manager trust level.
+
+        manager_trust = 0.5 (default) → threshold = 0.75 (original behaviour)
+        manager_trust = 0.8            → threshold = 0.50 (auto-approves faster)
+        manager_trust = 1.0            → threshold = 0.50 (floor)
+        manager_trust = 0.0            → threshold = 1.00 (never self-approves)
+        """
+        manager_trust = data.agent_trust.get(0, 0.5)
+        # threshold decreases linearly from 1.0 to 0.5 as trust goes from 0 → 1
+        return max(0.5, 1.0 - manager_trust)
+
     async def _adaptive_checkpoint(
         self,
         data: SessionData,
@@ -213,13 +234,15 @@ class SessionManager:
     ) -> None:
         """Checkpoint that the Manager may self-approve when confidence is high."""
         has_critical_flag = any(f.get("critical", False) for f in data.milestone_flags)
+        threshold = self._effective_threshold(data)
 
-        if not has_critical_flag and data.confidence >= CONFIDENCE_SELF_APPROVE_THRESHOLD:
+        if not has_critical_flag and data.confidence >= threshold:
             pct = f"{data.confidence:.0%}"
+            thr_pct = f"{threshold:.0%}"
             emit("activity", {
                 "agentIndex": 0,
                 "message": (
-                    f"Confidence {pct} ≥ 75% — self-approving '{title}'. "
+                    f"Confidence {pct} ≥ {thr_pct} — self-approving '{title}'. "
                     "Human override available via confirm button."
                 ),
                 "level": "info",
@@ -293,7 +316,8 @@ class SessionManager:
                 review = await manager.review_milestone(
                     "Senior Designer", milestone_name, summary, scope_doc, emit
                 )
-                if review.get("needs_human", False):
+                # Only flag if Senior's trust is below 0.7
+                if review.get("needs_human", False) and data.agent_trust.get(1, 0.5) < 0.7:
                     data.milestone_flags.append({"reason": review.get("reason", ""), "critical": False})
                 return review.get("feedback", "")
 
@@ -301,7 +325,8 @@ class SessionManager:
                 review = await manager.review_milestone(
                     "Visual Designer", milestone_name, summary, scope_doc, emit
                 )
-                if review.get("needs_human", False):
+                # Only flag if Visual's trust is below 0.7
+                if review.get("needs_human", False) and data.agent_trust.get(3, 0.5) < 0.7:
                     data.milestone_flags.append({"reason": review.get("reason", ""), "critical": False})
                 return review.get("feedback", "")
 
@@ -349,7 +374,8 @@ class SessionManager:
                 review = await manager.review_milestone(
                     "Junior Designer", milestone_name, summary, scope_doc, emit
                 )
-                if review.get("needs_human", False):
+                # Only flag if Junior's trust is below 0.7
+                if review.get("needs_human", False) and data.agent_trust.get(2, 0.5) < 0.7:
                     data.milestone_flags.append({
                         "reason": review.get("reason", ""),
                         "critical": review.get("score", 10) < 5,
@@ -388,12 +414,24 @@ class SessionManager:
 
             cp2_feedback = (data.resume_data or {}).get("feedback", "")
 
+            # ── Phase 2b: Senior reviews Junior + Visual implementation ─────
+            emit("activity", {
+                "agentIndex": 1,
+                "message": "Reviewing Junior's components and token adherence…",
+                "level": "info",
+            })
+            senior_impl_review = await senior.review_implementation(
+                junior_out, visual_out, scope_doc, emit,
+            )
+            data.senior_impl_review = senior_impl_review
+
             # ── Phase 3: Reviewing ──────────────────────────────────────────
             emit("phase_change", {"phase": "reviewing"})
 
             review = await manager.review_outputs(
                 scope_doc, senior_out, visual_out, junior_out, emit,
                 optimization_prep=opt_prep,
+                senior_impl_review=senior_impl_review,
             )
             data.review = review
 

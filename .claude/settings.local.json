@@ -1,7 +1,26 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install)"
+      "Bash(npm install)",
+      "Bash(curl -s \"http://localhost:3002/src/store/useStore.ts\")",
+      "Bash(curl -s \"http://localhost:3002/src/three/Engine.ts\")",
+      "Bash(kill 24087)",
+      "Bash(curl -s \"http://localhost:3002/src/App.tsx\")",
+      "Bash(curl -s \"http://localhost:3002/src/components/AgentGraph.tsx\")",
+      "Bash(curl -s \"http://localhost:3002/src/components/DesignViewer.tsx\")",
+      "Bash(curl -s \"http://localhost:3002/src/three/SceneManager.ts\")",
+      "Bash(curl -s \"http://localhost:3002/src/components/LeftPanel.tsx\")",
+      "Bash(lsof -ti :3001 -ti :3002)",
+      "Bash(xargs -I{} ps -p {} -o pid,command)",
+      "Bash(lsof -p 91655 -i)",
+      "Bash(curl -s http://localhost:3001/)",
+      "Bash(kill 91655)",
+      "Bash(curl -s \"http://localhost:3001/src/data/agents.ts\")",
+      "Bash(curl -s \"http://localhost:3001/src/types.ts\")",
+      "Bash(curl -s -o /dev/null -w \"Frontend \\(3001\\): %{http_code}\\\\n\" http://localhost:3001/)",
+      "Bash(curl -s -o /dev/null -w \"Backend \\(8000\\): %{http_code}\\\\n\" http://localhost:8000/api/health)",
+      "Bash(curl -s -o /dev/null -w \"Backend \\(8000\\): %{http_code}\\\\n\" http://localhost:8000/)",
+      "Bash(node -e \":*)"
     ]
   }
 }

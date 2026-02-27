@@ -33,7 +33,7 @@ async def health() -> HealthResponse:
 async def start_session(body: StartSessionRequest) -> StartSessionResponse:
     if not body.brief.strip():
         raise HTTPException(status_code=422, detail="brief must not be empty")
-    session_id = await _manager.create_session(body.brief)
+    session_id = await _manager.create_session(body.brief, agent_trust=body.agent_trust)
     return StartSessionResponse(session_id=session_id)
 
 

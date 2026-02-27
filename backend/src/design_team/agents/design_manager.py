@@ -326,6 +326,7 @@ Return a JSON object:
         junior_output: dict,
         emit: EmitFn,
         optimization_prep: dict | None = None,
+        senior_impl_review: dict | None = None,
     ) -> dict:
         """Produce the final quality report, applying the criteria prepared in advance."""
         self.emit_status(emit, "reviewing", "Applying pre-prepared criteria to all deliverables…", 0.8)
@@ -346,11 +347,22 @@ Skill-evolution directives: {json.dumps(skill_dirs)}
 Optimization notes: {optimization_prep.get("optimization_notes", "")}
 """
 
+        senior_review_section = ""
+        if senior_impl_review:
+            senior_review_section = f"""
+SENIOR DESIGNER'S IMPLEMENTATION REVIEW:
+UX Adherence: {senior_impl_review.get("ux_adherence_score", "N/A")}/10
+Token Usage: {senior_impl_review.get("token_usage_score", "N/A")}/10
+Issues: {senior_impl_review.get("component_issues", [])}
+Highlights: {senior_impl_review.get("positive_highlights", [])}
+Assessment: {senior_impl_review.get("overall_assessment", "")}
+"""
+
         user_prompt = f"""Final quality review of all three designer outputs.
 
 SCOPE DOCUMENT:
 {json.dumps(scope_doc, indent=2)}
-{criteria_section}
+{criteria_section}{senior_review_section}
 SENIOR DESIGNER OUTPUT (summary):
 {str(senior_output)[:400]}
 
@@ -360,7 +372,7 @@ VISUAL DESIGNER OUTPUT (summary):
 JUNIOR DESIGNER OUTPUT (summary):
 {str(junior_output)[:400]}
 
-Apply the prepared criteria and return a JSON object:
+Apply the prepared criteria and the Senior Designer's implementation review. Return a JSON object:
 {{
   "overall_score": 8,
   "scope_alignment": 9,

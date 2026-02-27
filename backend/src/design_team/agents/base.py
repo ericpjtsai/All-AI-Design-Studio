@@ -11,7 +11,7 @@ from ..api.models import ActivityPayload, AgentUpdatePayload
 # Emit callback type: receives event-name + payload dict, puts it on the SSE queue
 EmitFn = Callable[[str, dict], None]
 
-MODEL = "gemini-3.1-pro-preview"
+MODEL = "gemini-3-flash-preview"
 
 
 class BaseAgent:

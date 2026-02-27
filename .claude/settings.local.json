@@ -20,7 +20,12 @@
       "Bash(curl -s -o /dev/null -w \"Frontend \\(3001\\): %{http_code}\\\\n\" http://localhost:3001/)",
       "Bash(curl -s -o /dev/null -w \"Backend \\(8000\\): %{http_code}\\\\n\" http://localhost:8000/api/health)",
       "Bash(curl -s -o /dev/null -w \"Backend \\(8000\\): %{http_code}\\\\n\" http://localhost:8000/)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(lsof:*)",
+      "Bash(pgrep:*)",
+      "Bash(ps:*)",
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

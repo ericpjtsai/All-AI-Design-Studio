@@ -12,26 +12,33 @@ const Card: React.FC<{
 }> = ({ title, badge, badgeColor = '#7EACEA', children, defaultOpen = false }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border border-zinc-800 rounded-xl overflow-hidden">
+    <div className="overflow-hidden" style={{ border: '1px solid rgba(0,0,0,0.06)', borderRadius: 16 }}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-zinc-900/60 hover:bg-zinc-900 transition-colors text-left"
+        className="w-full flex items-center justify-between px-5 py-3.5 text-left transition-colors"
+        style={{ background: open ? '#fff' : '#fafafa' }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#f4f4f5'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = open ? '#fff' : '#fafafa'; }}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-zinc-200">{title}</span>
+        <div className="flex items-center gap-2.5">
+          <span className="text-[12px] font-black text-zinc-900">{title}</span>
           {badge && (
             <span
-              className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full"
-              style={{ backgroundColor: `${badgeColor}20`, color: badgeColor }}
+              className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
+              style={{ background: `${badgeColor}15`, color: badgeColor }}
             >
               {badge}
             </span>
           )}
         </div>
-        <span className="text-zinc-500 text-[11px]">{open ? '▲' : '▼'}</span>
+        <span className="text-[10px]" style={{ color: '#a1a1aa' }}>{open ? '▲' : '▼'}</span>
       </button>
-      {open && <div className="p-4">{children}</div>}
+      {open && (
+        <div className="px-5 pb-5 pt-1 bg-white" style={{ borderTop: '1px solid #f4f4f5' }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 };
@@ -39,11 +46,11 @@ const Card: React.FC<{
 // ── Score pill ────────────────────────────────────────────────────────────────
 
 const ScorePill: React.FC<{ label: string; value: number | null | undefined }> = ({ label, value }) => {
-  const color = !value ? '#52525b' : value >= 8 ? '#22c55e' : value >= 6 ? '#eab308' : '#ef4444';
+  const color = !value ? '#d4d4d8' : value >= 8 ? '#22c55e' : value >= 6 ? '#f59e0b' : '#ef4444';
   return (
-    <div className="flex items-center justify-between py-1 border-b border-zinc-800 last:border-0">
-      <span className="text-[11px] text-zinc-400">{label}</span>
-      <span className="text-[11px] font-bold tabular-nums" style={{ color }}>
+    <div className="flex items-center justify-between py-1.5" style={{ borderBottom: '1px solid #f4f4f5' }}>
+      <span className="text-[11px] font-medium" style={{ color: '#71717a' }}>{label}</span>
+      <span className="text-[11px] font-black tabular-nums" style={{ color }}>
         {value != null ? `${value}/10` : '—'}
       </span>
     </div>
@@ -53,13 +60,13 @@ const ScorePill: React.FC<{ label: string; value: number | null | undefined }> =
 // ── Color swatch ──────────────────────────────────────────────────────────────
 
 const ColorSwatch: React.FC<{ name: string; value: string }> = ({ name, value }) => (
-  <div className="flex items-center gap-2">
+  <div className="flex items-center gap-2.5">
     <div
-      className="w-5 h-5 rounded border border-zinc-700 shrink-0"
-      style={{ backgroundColor: value }}
+      className="w-5 h-5 rounded-md shrink-0"
+      style={{ background: value, border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
     />
-    <span className="text-[10px] text-zinc-400 truncate flex-1">{name}</span>
-    <span className="text-[9px] text-zinc-600 tabular-nums font-mono">{value}</span>
+    <span className="text-[10px] font-medium truncate flex-1" style={{ color: '#71717a' }}>{name}</span>
+    <span className="text-[9px] tabular-nums font-mono" style={{ color: '#a1a1aa' }}>{value}</span>
   </div>
 );
 
@@ -74,10 +81,8 @@ export const DesignViewer: React.FC = () => {
   const [protoFullscreen, setProtoFullscreen] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
 
-  // Poll outputs every 5s when a session is active
   useEffect(() => {
     if (!sessionId) return;
-
     const fetchOutputs = async () => {
       try {
         const res = await fetch(`/api/sessions/${sessionId}/outputs`);
@@ -85,11 +90,8 @@ export const DesignViewer: React.FC = () => {
           const data = await res.json() as DesignOutputs;
           setDesignOutputs(data);
         }
-      } catch {
-        // Ignore fetch errors — backend might not be ready yet
-      }
+      } catch { /* ignore */ }
     };
-
     fetchOutputs();
     const interval = setInterval(fetchOutputs, 5000);
     return () => clearInterval(interval);
@@ -97,14 +99,16 @@ export const DesignViewer: React.FC = () => {
 
   if (!sessionId && !designOutputs) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-8">
-        <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-2xl">
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-12">
+        <div className="w-14 h-14 rounded-[20px] flex items-center justify-center text-2xl" style={{ background: '#f4f4f5', border: '1px solid rgba(0,0,0,0.05)' }}>
           🎨
         </div>
-        <p className="text-zinc-400 text-sm font-medium">No session active</p>
-        <p className="text-zinc-600 text-xs leading-relaxed">
-          Enter a design brief on the left and start a session to see real-time design outputs here.
-        </p>
+        <div>
+          <p className="text-[14px] font-black text-zinc-900 mb-1">No session active</p>
+          <p className="text-[12px] font-medium leading-relaxed" style={{ color: '#a1a1aa' }}>
+            Enter a design brief on the left and start a session to see real-time design outputs here.
+          </p>
+        </div>
       </div>
     );
   }
@@ -114,13 +118,15 @@ export const DesignViewer: React.FC = () => {
   if (!outputs || Object.keys(outputs.scope_doc ?? {}).length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-[#7EACEA] animate-pulse" />
-          <p className="text-zinc-400 text-sm">
+        <div className="flex items-center gap-2.5">
+          <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#7EACEA' }} />
+          <p className="text-[13px] font-medium" style={{ color: '#71717a' }}>
             {workflowPhase === 'scoping' ? 'Analyzing brief…' : 'Waiting for outputs…'}
           </p>
         </div>
-        <p className="text-zinc-600 text-xs">Outputs will appear here as agents complete their work.</p>
+        <p className="text-[11px] font-medium" style={{ color: '#d4d4d8' }}>
+          Outputs appear here as agents complete their work.
+        </p>
       </div>
     );
   }
@@ -132,48 +138,43 @@ export const DesignViewer: React.FC = () => {
   const review = outputs.review ?? {};
   const seniorImplReview = outputs.senior_impl_review ?? {};
 
-  // Extract tokens
   const tokens = (visualOut.design_tokens as Record<string, unknown>) ?? {};
   const colorPrimitives = (tokens.color as Record<string, unknown> ?? {}).primitives as Record<string, string> | undefined;
   const colorSemantic = (tokens.color as Record<string, unknown> ?? {}).semantic as Record<string, string> | undefined;
-
-  // Extract components
   const components = (juniorOut.components as Array<Record<string, unknown>>) ?? [];
   const htmlPrototype = (juniorOut.html_prototype as string) ?? '';
-
-  // Selected component code
   const selectedComp = components.find((c) => c.name === selectedComponent);
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto px-4 py-4 gap-3 [scrollbar-width:thin] [scrollbar-color:#3f3f46_transparent]">
+    <div className="flex flex-col h-full overflow-y-auto px-6 py-5 gap-3">
 
       {/* Scope Document */}
       <Card title="Design Scope" badge="Confirmed" badgeColor="#22c55e" defaultOpen>
-        <div className="space-y-2">
+        <div className="space-y-3 pt-3">
           {!!scopeDoc.project_overview && (
-            <p className="text-xs text-zinc-300 leading-relaxed">{String(scopeDoc.project_overview)}</p>
+            <p className="text-[12px] font-medium leading-relaxed" style={{ color: '#52525b' }}>{String(scopeDoc.project_overview)}</p>
           )}
-          <div className="grid grid-cols-2 gap-2 mt-2">
+          <div className="grid grid-cols-2 gap-3">
             {!!scopeDoc.target_users && (
               <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-zinc-600 mb-1">Users</p>
-                <p className="text-[10px] text-zinc-400">{String(scopeDoc.target_users)}</p>
+                <p className="text-[9px] font-black uppercase tracking-wider mb-1" style={{ color: '#a1a1aa' }}>Users</p>
+                <p className="text-[11px] font-medium" style={{ color: '#71717a' }}>{String(scopeDoc.target_users)}</p>
               </div>
             )}
             {!!scopeDoc.visual_direction && (
               <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-zinc-600 mb-1">Visual</p>
-                <p className="text-[10px] text-zinc-400">{String(scopeDoc.visual_direction)}</p>
+                <p className="text-[9px] font-black uppercase tracking-wider mb-1" style={{ color: '#a1a1aa' }}>Visual</p>
+                <p className="text-[11px] font-medium" style={{ color: '#71717a' }}>{String(scopeDoc.visual_direction)}</p>
               </div>
             )}
           </div>
           {Array.isArray(scopeDoc.in_scope) && scopeDoc.in_scope.length > 0 && (
             <div>
-              <p className="text-[9px] font-black uppercase tracking-wider text-zinc-600 mb-1">In Scope</p>
-              <ul className="space-y-0.5">
+              <p className="text-[9px] font-black uppercase tracking-wider mb-2" style={{ color: '#a1a1aa' }}>In Scope</p>
+              <ul className="space-y-1">
                 {(scopeDoc.in_scope as string[]).map((item, i) => (
-                  <li key={i} className="text-[10px] text-zinc-400 flex gap-1">
-                    <span className="text-green-500">✓</span>{item}
+                  <li key={i} className="text-[11px] font-medium flex gap-1.5" style={{ color: '#71717a' }}>
+                    <span style={{ color: '#22c55e' }}>✓</span>{item}
                   </li>
                 ))}
               </ul>
@@ -185,14 +186,14 @@ export const DesignViewer: React.FC = () => {
       {/* Wireframes */}
       {!!seniorOut.wireframes && (
         <Card title="Wireframes" badge={`${(seniorOut.wireframes as unknown[]).length} screens`}>
-          <div className="space-y-2">
+          <div className="space-y-2 pt-3">
             {((seniorOut.wireframes as Array<Record<string, unknown>>) ?? []).map((w, i) => (
-              <div key={i} className="border border-zinc-800 rounded-lg p-3">
-                <p className="text-[11px] font-bold text-zinc-200 mb-1">
+              <div key={i} className="rounded-xl p-3" style={{ background: '#fafafa', border: '1px solid #f0f0f0' }}>
+                <p className="text-[12px] font-black text-zinc-900 mb-1">
                   {String(w.screen_name ?? w.screen_id ?? `Screen ${i + 1}`)}
                 </p>
                 {!!w.layout_props && (
-                  <p className="text-[10px] text-zinc-500 font-mono">
+                  <p className="text-[10px] font-mono" style={{ color: '#a1a1aa' }}>
                     {JSON.stringify(w.layout_props).slice(0, 80)}
                   </p>
                 )}
@@ -205,24 +206,24 @@ export const DesignViewer: React.FC = () => {
       {/* Design Tokens */}
       {Object.keys(tokens).length > 0 && (
         <Card title="Design Tokens" badge={`${Object.keys(tokens).length} categories`} badgeColor="#EF52BA">
-          <div className="space-y-3">
+          <div className="space-y-4 pt-3">
             {colorPrimitives && (
               <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-zinc-600 mb-2">Color Primitives</p>
-                <div className="space-y-1">
+                <p className="text-[9px] font-black uppercase tracking-wider mb-2" style={{ color: '#a1a1aa' }}>Color Primitives</p>
+                <div className="space-y-1.5">
                   {Object.entries(colorPrimitives).slice(0, 8).map(([k, v]) => (
                     <ColorSwatch key={k} name={k} value={String(v)} />
                   ))}
                   {Object.keys(colorPrimitives).length > 8 && (
-                    <p className="text-[9px] text-zinc-600">+{Object.keys(colorPrimitives).length - 8} more</p>
+                    <p className="text-[9px] font-medium" style={{ color: '#d4d4d8' }}>+{Object.keys(colorPrimitives).length - 8} more</p>
                   )}
                 </div>
               </div>
             )}
             {colorSemantic && (
               <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-zinc-600 mb-2">Semantic Colors</p>
-                <div className="space-y-1">
+                <p className="text-[9px] font-black uppercase tracking-wider mb-2" style={{ color: '#a1a1aa' }}>Semantic Colors</p>
+                <div className="space-y-1.5">
                   {Object.entries(colorSemantic).slice(0, 6).map(([k, v]) => (
                     <ColorSwatch key={k} name={k} value={String(v)} />
                   ))}
@@ -231,8 +232,8 @@ export const DesignViewer: React.FC = () => {
             )}
             {!!tokens.typography && (
               <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-zinc-600 mb-1">Typography</p>
-                <pre className="text-[9px] text-zinc-500 font-mono overflow-x-auto">
+                <p className="text-[9px] font-black uppercase tracking-wider mb-1.5" style={{ color: '#a1a1aa' }}>Typography</p>
+                <pre className="text-[9px] font-mono overflow-x-auto rounded-xl p-3" style={{ background: '#fafafa', color: '#71717a' }}>
                   {JSON.stringify(tokens.typography, null, 2).slice(0, 200)}
                 </pre>
               </div>
@@ -244,31 +245,31 @@ export const DesignViewer: React.FC = () => {
       {/* React Components */}
       {components.length > 0 && (
         <Card title="React Components" badge={`${components.length} built`} badgeColor="#ef4444">
-          <div className="space-y-2">
+          <div className="space-y-2 pt-3">
             <div className="flex flex-wrap gap-1.5 mb-3">
               {components.map((c) => (
                 <button
                   key={String(c.name)}
                   type="button"
                   onClick={() => setSelectedComponent(selectedComponent === c.name ? null : String(c.name))}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors ${
+                  className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all"
+                  style={
                     selectedComponent === c.name
-                      ? 'bg-[#ef4444]/20 text-[#ef4444] border border-[#ef4444]/40'
-                      : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-700'
-                  }`}
+                      ? { background: '#fff0f0', color: '#ef4444', border: '1.5px solid #fecaca' }
+                      : { background: '#f4f4f5', color: '#71717a', border: '1.5px solid transparent' }
+                  }
                 >
                   {String(c.name)}
                 </button>
               ))}
             </div>
-
             {selectedComp && (
-              <div className="rounded-lg bg-zinc-950 border border-zinc-800 overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-800">
-                  <span className="text-[10px] font-bold text-zinc-300">{String(selectedComp.name)}.tsx</span>
-                  <span className="text-[9px] text-zinc-600">TypeScript · React</span>
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #f0f0f0' }}>
+                <div className="flex items-center justify-between px-3 py-2" style={{ background: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
+                  <span className="text-[10px] font-black text-zinc-900">{String(selectedComp.name)}.tsx</span>
+                  <span className="text-[9px] font-medium" style={{ color: '#a1a1aa' }}>TypeScript · React</span>
                 </div>
-                <pre className="text-[9px] text-zinc-400 font-mono p-3 overflow-x-auto max-h-64 overflow-y-auto leading-relaxed">
+                <pre className="text-[9px] font-mono p-3 overflow-x-auto max-h-64 overflow-y-auto leading-relaxed bg-white" style={{ color: '#52525b' }}>
                   {String(selectedComp.tsx_code ?? '')}
                 </pre>
               </div>
@@ -280,55 +281,49 @@ export const DesignViewer: React.FC = () => {
       {/* HTML Prototype */}
       {htmlPrototype && (
         <Card title="HTML Prototype" badge="Live Preview" badgeColor="#7EACEA">
-          <div className="space-y-2">
+          <div className="space-y-2 pt-3">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] text-zinc-500">Rendered in sandboxed iframe</p>
+              <p className="text-[10px] font-medium" style={{ color: '#a1a1aa' }}>Rendered in sandboxed iframe</p>
               <button
                 type="button"
                 onClick={() => setProtoFullscreen(true)}
-                className="text-[10px] text-[#7EACEA] hover:text-white transition-colors"
+                className="text-[10px] font-black uppercase tracking-wide transition-colors hover:opacity-70"
+                style={{ color: '#7EACEA' }}
               >
-                ⤢ Full screen
+                ⤢ Full Screen
               </button>
             </div>
-            <div className="rounded-lg overflow-hidden border border-zinc-800 bg-white" style={{ height: '300px' }}>
-              <iframe
-                srcDoc={htmlPrototype}
-                sandbox="allow-scripts allow-same-origin"
-                className="w-full h-full"
-                title="HTML Prototype"
-              />
+            <div className="rounded-xl overflow-hidden bg-white" style={{ height: 280, border: '1px solid #f0f0f0' }}>
+              <iframe srcDoc={htmlPrototype} sandbox="allow-scripts allow-same-origin" className="w-full h-full" title="HTML Prototype" />
             </div>
           </div>
         </Card>
       )}
 
-      {/* Senior Implementation Review */}
+      {/* Senior Review */}
       {Object.keys(seniorImplReview).length > 0 && (
         <Card title="Senior Review" badge="UX Audit" badgeColor="#22c55e">
-          <div className="space-y-2">
-            <div className="space-y-0.5">
-              <ScorePill label="UX Adherence" value={seniorImplReview.ux_adherence_score as number} />
-              <ScorePill label="Token Usage" value={seniorImplReview.token_usage_score as number} />
-            </div>
+          <div className="space-y-3 pt-3">
+            <ScorePill label="UX Adherence" value={seniorImplReview.ux_adherence_score as number} />
+            <ScorePill label="Token Usage" value={seniorImplReview.token_usage_score as number} />
             {Array.isArray(seniorImplReview.positive_highlights) && seniorImplReview.positive_highlights.length > 0 && (
               <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-zinc-600 mb-1">Highlights</p>
+                <p className="text-[9px] font-black uppercase tracking-wider mb-1.5" style={{ color: '#a1a1aa' }}>Highlights</p>
                 {(seniorImplReview.positive_highlights as string[]).map((h, i) => (
-                  <p key={i} className="text-[10px] text-green-400 flex gap-1"><span>✓</span>{h}</p>
+                  <p key={i} className="text-[11px] font-medium flex gap-1.5" style={{ color: '#22c55e' }}><span>✓</span>{h}</p>
                 ))}
               </div>
             )}
             {Array.isArray(seniorImplReview.component_issues) && seniorImplReview.component_issues.length > 0 && (
               <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-zinc-600 mb-1">Issues</p>
+                <p className="text-[9px] font-black uppercase tracking-wider mb-1.5" style={{ color: '#a1a1aa' }}>Issues</p>
                 {(seniorImplReview.component_issues as string[]).map((issue, i) => (
-                  <p key={i} className="text-[10px] text-yellow-400 flex gap-1"><span>⚠</span>{issue}</p>
+                  <p key={i} className="text-[11px] font-medium flex gap-1.5" style={{ color: '#f59e0b' }}><span>⚠</span>{issue}</p>
                 ))}
               </div>
             )}
             {!!seniorImplReview.overall_assessment && (
-              <p className="text-[10px] text-zinc-400 leading-relaxed">{String(seniorImplReview.overall_assessment)}</p>
+              <p className="text-[11px] font-medium leading-relaxed" style={{ color: '#71717a' }}>{String(seniorImplReview.overall_assessment)}</p>
             )}
           </div>
         </Card>
@@ -337,38 +332,28 @@ export const DesignViewer: React.FC = () => {
       {/* Quality Review */}
       {Object.keys(review).length > 0 && (
         <Card title="Quality Review" badge={`${review.overall_score ?? '—'}/10`} badgeColor="#7EACEA" defaultOpen>
-          <div className="space-y-2">
-            <div className="space-y-0.5">
-              <ScorePill label="Overall" value={review.overall_score as number} />
-              <ScorePill label="Scope Alignment" value={review.scope_alignment as number} />
-              <ScorePill label="Completeness" value={review.completeness as number} />
-              <ScorePill label="Coherence" value={review.coherence as number} />
-              <ScorePill label="Production Readiness" value={review.production_readiness as number} />
-            </div>
+          <div className="space-y-1 pt-3">
+            <ScorePill label="Overall" value={review.overall_score as number} />
+            <ScorePill label="Scope Alignment" value={review.scope_alignment as number} />
+            <ScorePill label="Completeness" value={review.completeness as number} />
+            <ScorePill label="Coherence" value={review.coherence as number} />
+            <ScorePill label="Production Readiness" value={review.production_readiness as number} />
             {!!review.summary && (
-              <p className="text-[10px] text-zinc-400 leading-relaxed mt-2">{String(review.summary)}</p>
+              <p className="text-[11px] font-medium leading-relaxed pt-2" style={{ color: '#71717a' }}>{String(review.summary)}</p>
             )}
           </div>
         </Card>
       )}
 
-      {/* Fullscreen prototype modal */}
+      {/* Fullscreen modal */}
       {protoFullscreen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 flex flex-col"
-          onClick={() => setProtoFullscreen(false)}
-        >
-          <div className="flex items-center justify-between p-4">
-            <span className="text-zinc-300 text-sm font-bold">HTML Prototype — Full Screen</span>
-            <button type="button" className="text-zinc-400 hover:text-white text-xl">✕</button>
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }} onClick={() => setProtoFullscreen(false)}>
+          <div className="flex items-center justify-between p-5">
+            <span className="text-sm font-black text-white">HTML Prototype — Full Screen</span>
+            <button type="button" className="text-white/60 hover:text-white text-xl transition-colors">✕</button>
           </div>
-          <div className="flex-1 m-4 rounded-xl overflow-hidden bg-white" onClick={(e) => e.stopPropagation()}>
-            <iframe
-              srcDoc={htmlPrototype}
-              sandbox="allow-scripts allow-same-origin"
-              className="w-full h-full"
-              title="HTML Prototype Full"
-            />
+          <div className="flex-1 m-5 mt-0 rounded-2xl overflow-hidden bg-white" onClick={(e) => e.stopPropagation()}>
+            <iframe srcDoc={htmlPrototype} sandbox="allow-scripts allow-same-origin" className="w-full h-full" title="HTML Prototype Full" />
           </div>
         </div>
       )}

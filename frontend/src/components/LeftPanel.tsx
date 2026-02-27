@@ -6,7 +6,7 @@ import AgentGraph from './AgentGraph';
 import ConfirmationPrompt from './ConfirmationPrompt';
 import ActivityFeed from './ActivityFeed';
 
-const PHASE_LABELS = ['Briefing', 'Scoping', 'Designing', 'Implementing', 'Reviewing', 'Complete'];
+const PHASE_LABELS = ['Brief', 'Scope', 'Design', 'Build', 'Review', 'Done'];
 const PHASE_INDEX: Record<string, number> = {
   briefing: 0,
   scoping: 1,
@@ -39,38 +39,38 @@ const LeftPanel: React.FC = () => {
   };
 
   return (
-    <div className="w-[380px] shrink-0 flex flex-col bg-zinc-950 overflow-hidden">
-      {/* ── Header ── */}
-      <div className="p-5 border-b border-zinc-800 shrink-0">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-2 h-8 rounded-full bg-[#7EACEA]" />
-          <div>
-            <h1 className="text-white font-black text-base tracking-tight">AI Design Studio</h1>
-            <p className="text-zinc-600 text-[10px] font-medium uppercase tracking-wider">
-              Multi-agent workflow
-            </p>
+    <div className="w-[390px] shrink-0 flex flex-col bg-white overflow-hidden" style={{ borderRadius: 32, border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 8px 40px rgba(0,0,0,0.08)' }}>
+      {/* Accent bar */}
+      <div className="h-1.5 w-full shrink-0" style={{ background: '#7EACEA' }} />
+
+      {/* Header */}
+      <div className="px-7 pt-6 pb-5 shrink-0" style={{ borderBottom: '1px solid #f4f4f5' }}>
+        <div className="flex items-start gap-3.5 mb-5">
+          <div className="w-2.5 h-10 rounded-full shrink-0 mt-0.5" style={{ background: '#7EACEA' }} />
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-black text-zinc-900 tracking-tight leading-tight">AI Design Studio</h1>
+            <p className="text-[12px] font-medium mt-0.5" style={{ color: '#a1a1aa' }}>Multi-agent design workflow</p>
           </div>
-          <div className="ml-auto">
-            <div
-              className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                workflowPhase === 'complete'
-                  ? 'bg-green-500/15 text-green-400'
-                  : 'bg-[#7EACEA]/10 text-[#7EACEA]'
-              }`}
-            >
-              {workflowPhase}
-            </div>
+          <div
+            className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 mt-1"
+            style={
+              workflowPhase === 'complete'
+                ? { background: '#dcfce7', color: '#16a34a' }
+                : { background: '#f4f4f5', color: '#71717a' }
+            }
+          >
+            {workflowPhase}
           </div>
         </div>
 
-        {/* Phase progress stepper */}
-        <div className="space-y-1.5">
+        {/* Phase stepper */}
+        <div className="space-y-2">
           <div className="flex items-center gap-0.5">
             {PHASE_LABELS.map((_, i) => (
               <div
                 key={i}
                 className="h-1 rounded-full flex-1 transition-all duration-500"
-                style={{ backgroundColor: i <= phaseIdx ? '#7EACEA' : '#27272a' }}
+                style={{ background: i <= phaseIdx ? '#7EACEA' : '#e4e4e7' }}
               />
             ))}
           </div>
@@ -78,10 +78,8 @@ const LeftPanel: React.FC = () => {
             {PHASE_LABELS.map((label, i) => (
               <span
                 key={label}
-                className="text-[9px] font-bold uppercase tracking-wider"
-                style={{
-                  color: i === phaseIdx ? '#7EACEA' : i < phaseIdx ? '#52525b' : '#3f3f46',
-                }}
+                className="text-[9px] font-black uppercase tracking-wider"
+                style={{ color: i === phaseIdx ? '#7EACEA' : i < phaseIdx ? '#a1a1aa' : '#d4d4d8' }}
               >
                 {label}
               </span>
@@ -90,75 +88,62 @@ const LeftPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Error banner ── */}
+      {/* Error banner */}
       {sessionError && (
-        <div className="mx-4 mt-3 p-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-2.5 shrink-0">
-          <span className="text-red-400 text-base leading-none mt-0.5">⚠</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-red-400 text-[11px] font-semibold leading-snug">{sessionError}</p>
-          </div>
-          <button
-            type="button"
-            onClick={resetSession}
-            className="shrink-0 text-[10px] font-black uppercase tracking-wider text-red-400 hover:text-red-300 transition-colors"
-          >
+        <div className="mx-5 mt-4 p-3.5 rounded-2xl flex items-start gap-2.5 shrink-0" style={{ background: '#fef2f2', border: '1px solid #fee2e2' }}>
+          <span className="text-sm leading-none mt-0.5" style={{ color: '#ef4444' }}>⚠</span>
+          <p className="flex-1 text-[11px] font-semibold leading-snug min-w-0" style={{ color: '#dc2626' }}>{sessionError}</p>
+          <button onClick={resetSession} className="shrink-0 text-[10px] font-black uppercase tracking-wider transition-colors hover:opacity-70" style={{ color: '#ef4444' }}>
             Reset
           </button>
         </div>
       )}
 
-      {/* ── Brief input (shown only before session starts) ── */}
+      {/* Brief input */}
       {!sessionId && workflowPhase === 'briefing' && (
-        <div className="p-4 border-b border-zinc-800 shrink-0">
-          <p className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-2">
-            Design Brief
-          </p>
+        <div className="px-7 py-5 shrink-0" style={{ borderBottom: '1px solid #f4f4f5' }}>
+          <p className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: '#a1a1aa' }}>Design Brief</p>
           <textarea
             value={brief}
             onChange={(e) => setBrief(e.target.value)}
             placeholder="Describe the product or UI you want the team to design…"
-            className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 rounded-xl px-3 py-2.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none resize-none transition-colors leading-relaxed"
-            rows={3}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleStart();
+            className="w-full rounded-2xl px-4 py-3 text-[13px] font-medium placeholder:font-medium focus:outline-none resize-none transition-all leading-relaxed"
+            style={{
+              background: '#f9f9f9',
+              border: '1.5px solid #e4e4e7',
+              color: '#18181b',
             }}
+            rows={3}
+            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleStart(); }}
           />
           <button
-            type="button"
             onClick={handleStart}
             disabled={!brief.trim() || launching}
-            className="mt-2 w-full py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest text-zinc-950 bg-[#7EACEA] hover:bg-[#9DBDEE] disabled:opacity-40 disabled:cursor-default transition-all active:scale-[0.98]"
+            className="mt-3 w-full py-3 rounded-xl text-[11px] font-black uppercase tracking-widest text-white transition-all active:scale-[0.98] disabled:opacity-30 disabled:cursor-default"
+            style={{ background: '#18181b', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}
           >
             {launching ? 'Launching…' : 'Start Session ⌘↵'}
           </button>
         </div>
       )}
 
-      {/* ── Agent interaction graph ── */}
-      <div className="border-b border-zinc-800 shrink-0">
+      {/* Agent graph */}
+      <div className="shrink-0" style={{ borderBottom: '1px solid #f4f4f5' }}>
         <AgentGraph />
       </div>
 
-      {/* ── Trust levels ── */}
-      <div className="px-4 py-3 border-b border-zinc-800 shrink-0">
-        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 mb-2.5">
-          Trust Levels
-        </p>
-        <div className="space-y-2">
+      {/* Trust levels */}
+      <div className="px-7 py-4 shrink-0" style={{ borderBottom: '1px solid #f4f4f5' }}>
+        <p className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: '#a1a1aa' }}>Trust Levels</p>
+        <div className="space-y-3">
           {AGENTS.map((agent) => {
             const pct = Math.round(agentTrust[agent.index] * 100);
             return (
-              <div key={agent.index} className="flex items-center gap-2">
-                {/* Color dot */}
-                <div
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: agent.color }}
-                />
-                {/* Name */}
-                <span className="text-[10px] text-zinc-400 w-[90px] shrink-0 truncate">
+              <div key={agent.index} className="flex items-center gap-2.5">
+                <div className="w-2 h-2 rounded-full shrink-0" style={{ background: agent.color }} />
+                <span className="text-[11px] font-medium w-[88px] shrink-0 truncate" style={{ color: '#71717a' }}>
                   {agent.role.replace(' Designer', '').replace(' Manager', ' Mgr')}
                 </span>
-                {/* Slider */}
                 <input
                   type="range"
                   min="0"
@@ -168,16 +153,16 @@ const LeftPanel: React.FC = () => {
                   aria-label={`${agent.role} trust level: ${pct}%`}
                   title={`${agent.role} trust level`}
                   onChange={(e) => setAgentTrust(agent.index, Number(e.target.value) / 100)}
-                  className="flex-1 h-1 rounded-full appearance-none cursor-pointer disabled:cursor-default disabled:opacity-50"
+                  className="flex-1 h-1 rounded-full appearance-none cursor-pointer disabled:cursor-default disabled:opacity-40"
                   style={{
-                    background: `linear-gradient(to right, ${agent.color} 0%, ${agent.color} ${pct}%, #27272a ${pct}%, #27272a 100%)`,
+                    background: `linear-gradient(to right, ${agent.color} 0%, ${agent.color} ${pct}%, #e4e4e7 ${pct}%, #e4e4e7 100%)`,
                     accentColor: agent.color,
+                    color: agent.color,
                   }}
                 />
-                {/* Percentage */}
                 <span
                   className="text-[10px] font-bold tabular-nums w-7 text-right shrink-0"
-                  style={{ color: pct >= 70 ? agent.color : '#52525b' }}
+                  style={{ color: pct >= 70 ? agent.color : '#d4d4d8' }}
                 >
                   {pct}%
                 </span>
@@ -186,24 +171,21 @@ const LeftPanel: React.FC = () => {
           })}
         </div>
         {sessionId && (
-          <p className="text-[9px] text-zinc-600 mt-1.5">Trust levels locked during session.</p>
+          <p className="text-[9px] mt-2.5" style={{ color: '#d4d4d8' }}>Trust levels locked during active session.</p>
         )}
       </div>
 
-      {/* ── Confirmation prompt (when pending) ── */}
-      <div className="px-4 shrink-0">
+      {/* Confirmation prompt */}
+      <div className="px-5 shrink-0">
         <AnimatePresence>
           {pendingConfirmation && (
-            <ConfirmationPrompt
-              confirmation={pendingConfirmation}
-              agentColor={orchestrator.color}
-            />
+            <ConfirmationPrompt confirmation={pendingConfirmation} agentColor={orchestrator.color} />
           )}
         </AnimatePresence>
       </div>
 
-      {/* ── Activity feed (compact latest entries) ── */}
-      <div className="flex-1 overflow-hidden border-t border-zinc-800 min-h-0">
+      {/* Activity feed */}
+      <div className="flex-1 overflow-hidden min-h-0" style={{ borderTop: '1px solid #f4f4f5' }}>
         <ActivityFeed />
       </div>
     </div>

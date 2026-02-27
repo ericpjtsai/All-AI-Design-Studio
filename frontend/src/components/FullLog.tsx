@@ -10,14 +10,14 @@ const LEVEL_ICON: Record<string, string> = {
 };
 
 const LEVEL_COLOR: Record<string, string> = {
-  info: 'text-zinc-400',
-  success: 'text-green-400',
-  warn: 'text-yellow-400',
-  error: 'text-red-400',
+  info: '#a1a1aa',
+  success: '#22c55e',
+  warn: '#f59e0b',
+  error: '#ef4444',
 };
 
 const agentName = (index: number) => AGENTS[index]?.role ?? `Agent ${index}`;
-const agentColor = (index: number) => AGENTS[index]?.color ?? '#71717a';
+const agentColor = (index: number) => AGENTS[index]?.color ?? '#a1a1aa';
 
 export const FullLog: React.FC = () => {
   const activities = useStore((s) => s.activities);
@@ -27,7 +27,6 @@ export const FullLog: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
-  // Auto-scroll to latest only if user is already near the bottom
   useEffect(() => {
     if (!autoScroll) return;
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -36,8 +35,7 @@ export const FullLog: React.FC = () => {
   const handleScroll = () => {
     const el = containerRef.current;
     if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    setAutoScroll(nearBottom);
+    setAutoScroll(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
   };
 
   const filtered = activities.filter((a) => {
@@ -46,20 +44,31 @@ export const FullLog: React.FC = () => {
     return true;
   });
 
-  // Reverse so newest is at top (activities array is newest-first)
-  // but we want oldest at top for a natural log reading order
   const ordered = [...filtered].reverse();
+
+  const selectStyle: React.CSSProperties = {
+    background: 'white',
+    border: '1.5px solid #e4e4e7',
+    color: '#52525b',
+    borderRadius: 10,
+    padding: '3px 8px',
+    fontSize: 11,
+    fontWeight: 600,
+    fontFamily: 'Space Grotesk, sans-serif',
+    outline: 'none',
+    cursor: 'pointer',
+  };
 
   return (
     <div className="flex flex-col h-full">
       {/* Filter bar */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-zinc-800 shrink-0 flex-wrap">
-        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600">Filter:</span>
+      <div className="flex items-center gap-2 px-6 py-3 shrink-0 flex-wrap" style={{ borderBottom: '1px solid #f4f4f5' }}>
+        <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#a1a1aa' }}>Filter:</span>
 
         <select
           value={agentFilter === 'all' ? 'all' : String(agentFilter)}
           onChange={(e) => setAgentFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-          className="text-[10px] bg-zinc-900 border border-zinc-800 text-zinc-300 rounded px-1.5 py-0.5 focus:outline-none"
+          style={selectStyle}
         >
           <option value="all">All Agents</option>
           {AGENTS.map((a) => (
@@ -67,11 +76,7 @@ export const FullLog: React.FC = () => {
           ))}
         </select>
 
-        <select
-          value={levelFilter}
-          onChange={(e) => setLevelFilter(e.target.value)}
-          className="text-[10px] bg-zinc-900 border border-zinc-800 text-zinc-300 rounded px-1.5 py-0.5 focus:outline-none"
-        >
+        <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} style={selectStyle}>
           <option value="all">All Levels</option>
           <option value="info">Info</option>
           <option value="success">Success</option>
@@ -79,52 +84,48 @@ export const FullLog: React.FC = () => {
           <option value="error">Error</option>
         </select>
 
-        <span className="ml-auto text-[9px] text-zinc-600 tabular-nums">
-          {filtered.length} / {activities.length} entries
+        <span className="ml-auto text-[10px] font-medium tabular-nums" style={{ color: '#d4d4d8' }}>
+          {filtered.length} / {activities.length}
         </span>
       </div>
 
-      {/* Log entries */}
+      {/* Entries */}
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-2 space-y-0.5 [scrollbar-width:thin] [scrollbar-color:#3f3f46_transparent]"
+        className="flex-1 overflow-y-auto px-6 py-3 space-y-0.5"
       >
         {ordered.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-zinc-600 text-xs">No log entries yet. Start a session to see activity.</p>
+            <p className="text-[12px] font-medium" style={{ color: '#d4d4d8' }}>
+              No entries yet. Start a session to see activity.
+            </p>
           </div>
         ) : (
           ordered.map((entry) => (
-            <div
-              key={entry.id}
-              className="flex items-start gap-2 py-0.5 group"
-            >
-              {/* Agent color dot */}
+            <div key={entry.id} className="flex items-start gap-2 py-1 group rounded-lg px-2 transition-colors hover:bg-zinc-50">
+              {/* Agent dot */}
               <div
                 className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
-                style={{ backgroundColor: agentColor(entry.agentIndex) }}
+                style={{ background: agentColor(entry.agentIndex) }}
               />
-
               {/* Level icon */}
-              <span className={`text-[10px] font-bold shrink-0 mt-0.5 w-3 ${LEVEL_COLOR[entry.level ?? 'info']}`}>
+              <span className="text-[10px] font-bold shrink-0 mt-0.5 w-3" style={{ color: LEVEL_COLOR[entry.level ?? 'info'] }}>
                 {LEVEL_ICON[entry.level ?? 'info']}
               </span>
-
               {/* Message */}
-              <span className={`text-[11px] leading-snug flex-1 min-w-0 break-words ${LEVEL_COLOR[entry.level ?? 'info']}`}>
+              <span className="text-[11px] font-medium leading-snug flex-1 min-w-0 break-words" style={{ color: LEVEL_COLOR[entry.level ?? 'info'] }}>
                 {entry.message}
               </span>
-
-              {/* Right side: agent name + timestamp */}
+              {/* Meta on hover */}
               <div className="shrink-0 text-right hidden group-hover:flex flex-col items-end gap-0 min-w-[80px]">
-                <span className="text-[9px] font-semibold" style={{ color: agentColor(entry.agentIndex) }}>
+                <span className="text-[9px] font-black" style={{ color: agentColor(entry.agentIndex) }}>
                   {agentName(entry.agentIndex)}
                 </span>
-                <span className="text-[9px] text-zinc-600 tabular-nums">{entry.timestamp}</span>
+                <span className="text-[9px] tabular-nums" style={{ color: '#d4d4d8' }}>{entry.timestamp}</span>
               </div>
               <div className="shrink-0 group-hover:hidden">
-                <span className="text-[9px] text-zinc-600 tabular-nums">{entry.timestamp}</span>
+                <span className="text-[9px] tabular-nums" style={{ color: '#d4d4d8' }}>{entry.timestamp}</span>
               </div>
             </div>
           ))
@@ -132,17 +133,15 @@ export const FullLog: React.FC = () => {
         <div ref={bottomRef} />
       </div>
 
-      {/* Auto-scroll indicator */}
+      {/* Jump to latest */}
       {!autoScroll && (
         <button
           type="button"
-          onClick={() => {
-            setAutoScroll(true);
-            bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }}
-          className="shrink-0 mx-4 mb-2 py-1 rounded-lg bg-zinc-800 text-[10px] text-zinc-400 hover:text-white transition-colors"
+          onClick={() => { setAutoScroll(true); bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
+          className="shrink-0 mx-6 mb-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors hover:opacity-70"
+          style={{ background: '#f4f4f5', color: '#71717a' }}
         >
-          ↓ Jump to latest
+          ↓ Jump to Latest
         </button>
       )}
     </div>

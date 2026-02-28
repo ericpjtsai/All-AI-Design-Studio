@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import StreamingResponse
 from sse_starlette.sse import EventSourceResponse
 
 from .models import (
@@ -14,10 +13,12 @@ from .models import (
     StartSessionRequest,
     StartSessionResponse,
 )
-from ..session_manager import SessionManager
+
+from ..graph.session_manager_lg import LangGraphSessionManager
+
+_manager = LangGraphSessionManager()
 
 router = APIRouter()
-_manager = SessionManager()
 
 
 # ── Health ────────────────────────────────────────────────────────────────────

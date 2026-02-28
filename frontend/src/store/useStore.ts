@@ -79,6 +79,7 @@ interface StudioStore {
   _setPendingConfirmation: (payload: ConfirmationPayload | null) => void;
   _setComplete: () => void;
   _setSessionError: (message: string) => void;
+  _handleDesignOutput: (payload: { output_type: string; data: Record<string, unknown> }) => void;
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -130,6 +131,23 @@ export const useStore = create<StudioStore>()((set, get) => ({
       get()._updateAgent({ agentIndex: a.index, status: 'complete', isActive: false }),
     );
   },
+
+  _handleDesignOutput: ({ output_type, data }) =>
+    set((s) => ({
+      designOutputs: {
+        ...(s.designOutputs ?? {
+          scope_doc: {},
+          direction_brief: {},
+          senior_output: {},
+          visual_output: {},
+          junior_output: {},
+          cross_critique: {},
+          senior_impl_review: {},
+          review: {},
+        }),
+        [output_type]: data,
+      },
+    })),
 
   _setSessionError: (message) => {
     set((s) => ({
@@ -188,7 +206,7 @@ export const useStore = create<StudioStore>()((set, get) => ({
       get()._addActivity({ agentIndex: 0, message: 'Session started. Analyzing brief…' });
     } catch (err) {
       const msg = err instanceof TypeError && String(err).includes('fetch')
-        ? 'Cannot reach backend — is it running on port 8000?'
+        ? 'Cannot reach backend — is it running on port 8001?'
         : `Failed to start session: ${String(err)}`;
       set({ sessionError: msg });
     }

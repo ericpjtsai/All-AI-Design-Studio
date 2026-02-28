@@ -16,7 +16,10 @@ export class PlaygroundStage {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xffffff);
 
-    this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
+    // Use element dimensions for correct aspect ratio (falls back to 1 if not yet laid out)
+    const rect = rendererElement.getBoundingClientRect();
+    const aspect = rect.width > 0 && rect.height > 0 ? rect.width / rect.height : 1;
+    this.camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 500);
     this.camera.position.set(10, 8, 15);
 
     this.controls = new OrbitControls(this.camera, rendererElement);

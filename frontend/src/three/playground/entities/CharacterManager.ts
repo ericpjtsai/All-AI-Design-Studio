@@ -49,6 +49,8 @@ export class CharacterManager {
 
   public isLoaded = false;
 
+  private rollInTimers: ReturnType<typeof setTimeout>[] = [];
+
   constructor(private scene: THREE.Scene) {}
 
   public async load() {
@@ -172,6 +174,8 @@ export class CharacterManager {
     const tempColor = new THREE.Color();
     const spawnRadius = this.worldSize;
 
+    const npcCount = Math.min(this.instanceCount, AGENTS.length);
+
     for (let i = 0; i < this.instanceCount; i++) {
       const agent = AGENTS[i] || AGENTS[0];
       const colorOverride = this.colors && this.colors[i] ? this.colors[i] : agent.color;
@@ -179,6 +183,13 @@ export class CharacterManager {
       if (i === PLAYER_INDEX) {
         posArray[i * 4 + 0] = 0;
         posArray[i * 4 + 2] = 0;
+        posArray[i * 4 + 3] = 1;
+        tempColor.set(colorOverride);
+      } else if (i < npcCount) {
+        // NPCs start far off-screen, waiting for rollIn()
+        const angle = ((i - 1) / (npcCount - 1)) * Math.PI * 2;
+        posArray[i * 4 + 0] = Math.cos(angle) * spawnRadius * 3;
+        posArray[i * 4 + 2] = Math.sin(angle) * spawnRadius * 3;
         posArray[i * 4 + 3] = 1;
         tempColor.set(colorOverride);
       } else {
@@ -208,6 +219,10 @@ export class CharacterManager {
 
     this.agentStateBuffer = new AgentStateBuffer(this.instanceCount);
     this.agentStateBuffer.setState(PLAYER_INDEX, AgentBehavior.FROZEN);
+    // NPCs start frozen off-screen until rollIn() is called
+    for (let i = 1; i < npcCount; i++) {
+      this.agentStateBuffer.setState(i, AgentBehavior.FROZEN);
+    }
 
     this.expressionBuffer = new ExpressionBuffer(this.instanceCount);
 
@@ -430,6 +445,46 @@ export class CharacterManager {
       numBones,
       duration,
     };
+  }
+
+  /**
+   * Animate NPCs walking into the scene from off-screen, staggered.
+   * Each NPC gets a GOTO waypoint to a position inside the world.
+   * After all arrive, they switch to BOIDS for free movement.
+   */
+  public rollIn() {
+    if (!this.agentStateBuffer) return;
+
+    // Clear any pending timers from previous rollIn
+    for (const t of this.rollInTimers) clearTimeout(t);
+    this.rollInTimers = [];
+
+    const npcCount = Math.min(this.instanceCount, AGENTS.length);
+    const staggerMs = 500;
+
+    for (let i = 1; i < npcCount; i++) {
+      const delay = (i - 1) * staggerMs;
+      const t = setTimeout(() => {
+        // Target: spread NPCs around the world interior
+        const angle = ((i - 1) / (npcCount - 1)) * Math.PI * 2 + Math.random() * 0.4;
+        const radius = this.worldSize * 0.25 + Math.random() * this.worldSize * 0.35;
+        const tx = Math.cos(angle) * radius;
+        const tz = Math.sin(angle) * radius;
+
+        this.agentStateBuffer!.setWaypoint(i, tx, tz);
+        this.agentStateBuffer!.setState(i, AgentBehavior.GOTO);
+      }, delay);
+      this.rollInTimers.push(t);
+    }
+
+    // After all have walked in, switch to BOIDS
+    const totalDelay = (npcCount - 2) * staggerMs + 4000;
+    const t = setTimeout(() => {
+      if (this.agentStateBuffer) {
+        this.agentStateBuffer.resetAllNPCsToState(AgentBehavior.BOIDS);
+      }
+    }, totalDelay);
+    this.rollInTimers.push(t);
   }
 
   public fadeToAction(_name: string) {}

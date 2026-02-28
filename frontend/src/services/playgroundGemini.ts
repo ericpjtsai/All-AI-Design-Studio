@@ -16,22 +16,22 @@ export class PlaygroundGeminiService {
   async chat(
     systemInstruction: string,
     history: ChatMessage[],
-    message: string
+    message: string,
   ): Promise<string> {
     if (!this.available || !this.ai) {
       return "Hi! To enable AI responses, add GEMINI_API_KEY to your frontend .env file.";
     }
 
-    const model = "gemini-2.0-flash-001";
+    const model = import.meta.env.VITE_GEMINI_MODEL || "gemini-2.5-flash";
 
-    const contents = history.map(msg => ({
-      role: msg.role === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.text }]
+    const contents = history.map((msg) => ({
+      role: msg.role === "user" ? "user" : "model",
+      parts: [{ text: msg.text }],
     }));
 
     contents.push({
-      role: 'user',
-      parts: [{ text: message }]
+      role: "user",
+      parts: [{ text: message }],
     });
 
     try {
@@ -43,7 +43,7 @@ export class PlaygroundGeminiService {
           temperature: 0.7,
           topP: 0.95,
           topK: 40,
-        }
+        },
       });
 
       return response.text || "I'm sorry, I couldn't process that.";

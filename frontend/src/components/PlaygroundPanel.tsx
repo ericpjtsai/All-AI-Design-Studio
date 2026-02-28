@@ -2,23 +2,22 @@ import React, { useEffect, useRef, useState } from 'react';
 import { PlaygroundScene } from '../three/playground/PlaygroundScene';
 import PlaygroundOverlay from './playground/PlaygroundOverlay';
 
-interface AvatarPlaygroundProps {
-  onExit: () => void;
-}
-
-const AvatarPlayground: React.FC<AvatarPlaygroundProps> = ({ onExit }) => {
+const PlaygroundPanel: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<PlaygroundScene | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    if (containerRef.current && !sceneRef.current) {
-      sceneRef.current = new PlaygroundScene(containerRef.current);
-      // Give a brief delay to allow the scene to start initializing
-      setTimeout(() => setIsReady(true), 100);
-    }
+    // Defer to next frame so the container has actual dimensions after layout
+    const rafId = requestAnimationFrame(() => {
+      if (containerRef.current && !sceneRef.current) {
+        sceneRef.current = new PlaygroundScene(containerRef.current);
+        setTimeout(() => setIsReady(true), 100);
+      }
+    });
 
     return () => {
+      cancelAnimationFrame(rafId);
       if (sceneRef.current) {
         sceneRef.current.dispose();
         sceneRef.current = null;
@@ -27,7 +26,14 @@ const AvatarPlayground: React.FC<AvatarPlaygroundProps> = ({ onExit }) => {
   }, []);
 
   return (
-    <div className="relative w-screen h-screen bg-white overflow-hidden">
+    <div
+      className="w-[480px] h-full shrink-0 relative overflow-hidden bg-white"
+      style={{
+        borderRadius: 32,
+        border: '1px solid rgba(0,0,0,0.05)',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.08)',
+      }}
+    >
       {/* Three.js canvas container */}
       <div ref={containerRef} className="absolute inset-0 w-full h-full" />
 
@@ -36,15 +42,17 @@ const AvatarPlayground: React.FC<AvatarPlaygroundProps> = ({ onExit }) => {
         <div className="absolute inset-0 flex items-center justify-center bg-white z-20">
           <div className="text-center">
             <div className="w-12 h-12 border-2 border-zinc-200 border-t-[#7EACEA] rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-[11px] font-black uppercase tracking-widest text-zinc-400">Initializing WebGPU…</p>
+            <p className="text-[11px] font-black uppercase tracking-widest text-zinc-400">
+              Initializing WebGPU…
+            </p>
           </div>
         </div>
       )}
 
       {/* UI Overlay */}
-      {isReady && <PlaygroundOverlay onExit={onExit} />}
+      {isReady && <PlaygroundOverlay />}
     </div>
   );
 };
 
-export default AvatarPlayground;
+export default PlaygroundPanel;

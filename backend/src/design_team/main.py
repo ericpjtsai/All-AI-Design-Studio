@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv()
 
 from .api.routes import router  # noqa: E402 (import after load_dotenv)
+from .api.chat import router as chat_router  # noqa: E402
 
 app = FastAPI(
     title="AI Design Studio API",
@@ -25,6 +26,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(chat_router)
 
 
 if __name__ == "__main__":

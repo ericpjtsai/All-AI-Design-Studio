@@ -72,7 +72,11 @@ const ColorSwatch: React.FC<{ name: string; value: string }> = ({ name, value })
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export const DesignViewer: React.FC = () => {
+interface DesignViewerProps {
+  agentFilter?: string | null; // 'manager' | 'senior' | 'junior' | 'visual' | null (show all)
+}
+
+export const DesignViewer: React.FC<DesignViewerProps> = ({ agentFilter }) => {
   const sessionId = useStore((s) => s.sessionId);
   const workflowPhase = useStore((s) => s.workflowPhase);
   const designOutputs = useStore((s) => s.designOutputs);
@@ -145,11 +149,16 @@ export const DesignViewer: React.FC = () => {
   const htmlPrototype = (juniorOut.html_prototype as string) ?? '';
   const selectedComp = components.find((c) => c.name === selectedComponent);
 
+  // Agent filter: which sections to show per agent role
+  // null = show all, 'manager' = scope + quality, 'senior' = wireframes + senior review,
+  // 'junior' = components + prototype, 'visual' = tokens
+  const show = (owners: string[]) => !agentFilter || owners.includes(agentFilter);
+
   return (
     <div className="flex flex-col h-full overflow-y-auto px-6 py-5 gap-3">
 
-      {/* Scope Document */}
-      <Card title="Design Scope" badge="Confirmed" badgeColor="#22c55e" defaultOpen>
+      {/* Scope Document — owned by manager */}
+      {show(['manager']) && <Card title="Design Scope" badge="Confirmed" badgeColor="#22c55e" defaultOpen>
         <div className="space-y-3 pt-3">
           {!!scopeDoc.project_overview && (
             <p className="text-[12px] font-medium leading-relaxed" style={{ color: '#52525b' }}>{String(scopeDoc.project_overview)}</p>
@@ -181,10 +190,10 @@ export const DesignViewer: React.FC = () => {
             </div>
           )}
         </div>
-      </Card>
+      </Card>}
 
-      {/* Wireframes */}
-      {!!seniorOut.wireframes && (
+      {/* Wireframes — owned by senior */}
+      {show(['senior']) && !!seniorOut.wireframes && (
         <Card title="Wireframes" badge={`${(seniorOut.wireframes as unknown[]).length} screens`}>
           <div className="space-y-2 pt-3">
             {((seniorOut.wireframes as Array<Record<string, unknown>>) ?? []).map((w, i) => (
@@ -203,8 +212,8 @@ export const DesignViewer: React.FC = () => {
         </Card>
       )}
 
-      {/* Design Tokens */}
-      {Object.keys(tokens).length > 0 && (
+      {/* Design Tokens — owned by visual */}
+      {show(['visual']) && Object.keys(tokens).length > 0 && (
         <Card title="Design Tokens" badge={`${Object.keys(tokens).length} categories`} badgeColor="#EF52BA">
           <div className="space-y-4 pt-3">
             {colorPrimitives && (
@@ -242,8 +251,8 @@ export const DesignViewer: React.FC = () => {
         </Card>
       )}
 
-      {/* React Components */}
-      {components.length > 0 && (
+      {/* React Components — owned by junior */}
+      {show(['junior']) && components.length > 0 && (
         <Card title="React Components" badge={`${components.length} built`} badgeColor="#ef4444">
           <div className="space-y-2 pt-3">
             <div className="flex flex-wrap gap-1.5 mb-3">
@@ -278,8 +287,8 @@ export const DesignViewer: React.FC = () => {
         </Card>
       )}
 
-      {/* HTML Prototype */}
-      {htmlPrototype && (
+      {/* HTML Prototype — owned by junior */}
+      {show(['junior']) && htmlPrototype && (
         <Card title="HTML Prototype" badge="Live Preview" badgeColor="#7EACEA">
           <div className="space-y-2 pt-3">
             <div className="flex items-center justify-between mb-2">
@@ -300,8 +309,8 @@ export const DesignViewer: React.FC = () => {
         </Card>
       )}
 
-      {/* Senior Review */}
-      {Object.keys(seniorImplReview).length > 0 && (
+      {/* Senior Review — owned by senior */}
+      {show(['senior']) && Object.keys(seniorImplReview).length > 0 && (
         <Card title="Senior Review" badge="UX Audit" badgeColor="#22c55e">
           <div className="space-y-3 pt-3">
             <ScorePill label="UX Adherence" value={seniorImplReview.ux_adherence_score as number} />
@@ -329,8 +338,8 @@ export const DesignViewer: React.FC = () => {
         </Card>
       )}
 
-      {/* Quality Review */}
-      {Object.keys(review).length > 0 && (
+      {/* Quality Review — owned by manager */}
+      {show(['manager']) && Object.keys(review).length > 0 && (
         <Card title="Quality Review" badge={`${review.overall_score ?? '—'}/10`} badgeColor="#7EACEA" defaultOpen>
           <div className="space-y-1 pt-3">
             <ScorePill label="Overall" value={review.overall_score as number} />

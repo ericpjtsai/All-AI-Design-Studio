@@ -18,6 +18,7 @@ export function useSSEStream(sessionId: string | null): void {
     _setPendingConfirmation,
     _setComplete,
     _setSessionError,
+    _handleDesignOutput,
   } = useStore();
 
   useEffect(() => {
@@ -47,6 +48,11 @@ export function useSSEStream(sessionId: string | null): void {
       _setPendingConfirmation(payload);
     });
 
+    es.addEventListener('design_output', (e: MessageEvent) => {
+      const payload = JSON.parse(e.data);
+      _handleDesignOutput(payload);
+    });
+
     es.addEventListener('session_complete', () => {
       _setComplete();
       es.close();
@@ -59,7 +65,7 @@ export function useSSEStream(sessionId: string | null): void {
     });
 
     es.onerror = () => {
-      _setSessionError('Lost connection to backend. Is it running on port 8000?');
+      _setSessionError('Lost connection to backend. Is it running on port 8001?');
       es.close();
     };
 

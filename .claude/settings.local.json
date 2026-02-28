@@ -25,7 +25,16 @@
       "Bash(pgrep:*)",
       "Bash(ps:*)",
       "Bash(npm run:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npx vite build)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data[0][''text'']\\)\")",
+      "Bash(uv sync)",
+      "Bash(uv run python -c \":*)",
+      "Bash(python -c \"from design_team.api.chat import router; print\\(''Chat router OK:'', [r.path for r in router.routes]\\)\")",
+      "Bash(python3 -c \"from design_team.api.chat import router; print\\(''Chat router OK:'', [r.path for r in router.routes]\\)\")",
+      "Bash(uv run python -c \"from design_team.api.chat import router; print\\(''Chat router OK:'', [r.path for r in router.routes]\\)\")",
+      "Bash(uv run python -c \"from design_team.main import app; routes = [r.path for r in app.routes]; print\\(''All routes:'', routes\\)\")",
+      "Bash(uv run python -c \"from design_team.main import app; routes = [r.path for r in app.routes]; print\\(''Routes:'', routes\\); print\\(''Total:'', len\\(routes\\)\\)\")"
     ]
   }
 }

@@ -9,7 +9,7 @@ export const usePlaygroundStore = create<CharacterState>()(
     aiResponse: "Hello! I'm your AI character. Type something to talk to me.",
     isDebugOpen: false,
     instanceCount: 5,
-    worldSize: 25,
+    worldSize: 10,
 
     boidsParams: {
       speed: 0.025,

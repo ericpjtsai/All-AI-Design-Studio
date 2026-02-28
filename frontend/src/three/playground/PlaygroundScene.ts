@@ -8,16 +8,30 @@ import { AGENTS, PLAYER_INDEX } from '../../playground/agents';
 import { usePlaygroundStore } from '../../playground/store';
 import { AgentBehavior, ChatMessage } from '../../playground/types';
 import { playgroundGemini } from '../../services/playgroundGemini';
+import { useStore } from '../../store/useStore';
 import * as THREE from 'three/webgpu';
+
+/**
+ * Map playground NPC index → backend agent index.
+ * Playground: 0=CEO(player), 1=Manager, 2=Senior, 3=Junior, 4=Visual
+ * Backend:    0=Manager,      1=Senior,  2=Junior, 3=Visual
+ * Returns null for the CEO (no backend agent).
+ */
+function toBackendAgentIndex(playgroundIndex: number): number | null {
+  if (playgroundIndex === PLAYER_INDEX) return null;
+  return playgroundIndex - 1;
+}
 
 export class PlaygroundScene {
   private engine: Engine;
   private stage: Stage;
   private characters: CharacterManager;
+  private container: HTMLElement;
 
   private inputManager: InputManager | null = null;
   private behaviorManager: BehaviorManager | null = null;
   private selectedIndex: number | null = null;
+  private resizeObserver: ResizeObserver | null = null;
 
   private frameCount = 0;
   private lastTime = 0;
@@ -25,6 +39,7 @@ export class PlaygroundScene {
   private isDisposed = false;
 
   constructor(container: HTMLElement) {
+    this.container = container;
     this.engine = new Engine(container);
     this.stage = new Stage(this.engine.renderer.domElement);
     this.characters = new CharacterManager(this.stage.scene);
@@ -45,7 +60,9 @@ export class PlaygroundScene {
     this.stage.updateDimensions(state.worldSize);
 
     this.engine.renderer.setAnimationLoop(this.animate.bind(this));
-    window.addEventListener('resize', this.onResize.bind(this));
+    this.resizeObserver = new ResizeObserver(() => this.onResize());
+    this.resizeObserver.observe(this.container);
+    this.onResize();
 
     const stateBuffer = this.characters.getAgentStateBuffer();
     if (stateBuffer) {
@@ -124,7 +141,29 @@ export class PlaygroundScene {
         }));
 
         try {
-          const systemInstruction = `You are ${agent.role} at the AI Design Studio.
+          const sessionId = useStore.getState().sessionId;
+          const backendIdx = toBackendAgentIndex(state.selectedNpcIndex);
+
+          let responseText: string;
+
+          if (sessionId && backendIdx !== null) {
+            // Dual-mode: backend chat with session context
+            const history = usePlaygroundStore.getState().chatMessages.slice(0, -1);
+            const res = await fetch(`/api/sessions/${sessionId}/chat`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                agent_index: backendIdx,
+                message: text,
+                history: history.map(m => ({ role: m.role, text: m.text })),
+              }),
+            });
+            if (!res.ok) throw new Error(`Chat API error: ${res.status}`);
+            const data = await res.json();
+            responseText = data.reply;
+          } else {
+            // Fallback: client-side Gemini (no session or CEO)
+            const systemInstruction = `You are ${agent.role} at the AI Design Studio.
 Department: ${agent.department}
 Mission: ${agent.mission}
 Personality: ${agent.personality}
@@ -132,11 +171,12 @@ Expertise: ${agent.expertise.join(', ')}
 
 Keep your responses extremely brief (1-2 short sentences max) and professional, matching your corporate persona.`;
 
-          const responseText = await playgroundGemini.chat(
-            systemInstruction,
-            usePlaygroundStore.getState().chatMessages.slice(0, -1),
-            text
-          );
+            responseText = await playgroundGemini.chat(
+              systemInstruction,
+              usePlaygroundStore.getState().chatMessages.slice(0, -1),
+              text
+            );
+          }
 
           const modelMessage: ChatMessage = {
             role: 'model',
@@ -152,9 +192,16 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
           this.characters.fadeToAction('Wave');
           setTimeout(() => this.characters.fadeToAction('Idle'), 2000);
         } catch (error) {
-          console.error("Playground Gemini Error:", error);
+          console.error("Playground chat error:", error);
           usePlaygroundStore.setState({ isThinking: false });
         }
+      }
+    });
+
+    // Trigger avatar roll-in when workflow transitions from briefing
+    const sub0 = useStore.subscribe((state, prevState) => {
+      if (prevState.workflowPhase === 'briefing' && state.workflowPhase !== 'briefing') {
+        this.characters.rollIn();
       }
     });
 
@@ -190,12 +237,13 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
       }
     });
 
-    this.unsubs.push(sub1, sub2);
+    this.unsubs.push(sub0, sub1, sub2);
   }
 
   private onResize() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const w = this.container.clientWidth;
+    const h = this.container.clientHeight;
+    if (w === 0 || h === 0) return;
     this.engine.onResize(w, h);
     this.stage.onResize(w, h);
   }
@@ -231,8 +279,9 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
         const screenPos = npcPos.clone();
         screenPos.y += 1.3;
         screenPos.project(this.stage.camera);
-        const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
-        const y = (screenPos.y * -0.5 + 0.5) * window.innerHeight;
+        const rect = this.container.getBoundingClientRect();
+        const x = (screenPos.x * 0.5 + 0.5) * rect.width;
+        const y = (screenPos.y * -0.5 + 0.5) * rect.height;
         setSelectedPosition({ x, y });
       }
     } else {
@@ -271,7 +320,26 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
     usePlaygroundStore.setState({ isThinking: true });
 
     try {
-      const systemInstruction = `You are ${agent.role} at the AI Design Studio.
+      const sessionId = useStore.getState().sessionId;
+      const backendIdx = toBackendAgentIndex(npcIndex);
+
+      let responseText: string;
+
+      if (sessionId && backendIdx !== null) {
+        const res = await fetch(`/api/sessions/${sessionId}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agent_index: backendIdx,
+            message: "Hello! Please introduce yourself briefly and mention what you're currently working on.",
+            history: [],
+          }),
+        });
+        if (!res.ok) throw new Error(`Chat API error: ${res.status}`);
+        const data = await res.json();
+        responseText = data.reply;
+      } else {
+        const systemInstruction = `You are ${agent.role} at the AI Design Studio.
 Department: ${agent.department}
 Mission: ${agent.mission}
 Personality: ${agent.personality}
@@ -279,11 +347,12 @@ Expertise: ${agent.expertise.join(', ')}
 
 Keep your responses extremely brief (1-2 short sentences max) and professional. Introduce yourself very briefly and ask how you can help.`;
 
-      const responseText = await playgroundGemini.chat(
-        systemInstruction,
-        [],
-        "Hello! Please introduce yourself briefly."
-      );
+        responseText = await playgroundGemini.chat(
+          systemInstruction,
+          [],
+          "Hello! Please introduce yourself briefly."
+        );
+      }
 
       const modelMessage: ChatMessage = {
         role: 'model',
@@ -329,7 +398,7 @@ Keep your responses extremely brief (1-2 short sentences max) and professional. 
   public dispose() {
     this.isDisposed = true;
     this.unsubs.forEach(unsub => unsub());
-    window.removeEventListener('resize', this.onResize.bind(this));
+    this.resizeObserver?.disconnect();
     this.inputManager?.dispose();
     this.engine.dispose();
     if (this.stage.controls) this.stage.controls.dispose();

@@ -37,10 +37,21 @@ Return a JSON object with exactly these keys:
   "technical_constraints": "string",
   "priority_stack": ["highest priority first"],
   "success_criteria": ["criterion1"],
-  "clarifying_questions": ["question1", "question2"]
+  "clarifying_questions": [
+    {{
+      "question": "A specific question about something unclear in the brief",
+      "options": ["Option A", "Option B", "Option C", "Custom..."]
+    }}
+  ]
 }}
 
-If the brief is detailed enough, set clarifying_questions to an empty array.
+Rules for clarifying_questions:
+- Only ask about genuine ambiguities — things that will meaningfully change the design
+- 2–4 questions maximum. If the brief is already detailed, return an empty array []
+- Each question must have 3–4 concrete, mutually exclusive options that cover the most likely answers
+- Always include "Custom..." as the last option so the user can type their own answer
+- Options should be short (2–5 words each), actionable, and specific to this brief
+- Example questions: platform priority, target user type, visual style direction, key technical constraint
 """
         raw = await self.call_llm(
             system=DESIGN_MANAGER_SYSTEM,
@@ -54,7 +65,7 @@ If the brief is detailed enough, set clarifying_questions to an empty array.
         self.emit_activity(emit, "Scope document ready for review", "success")
 
         try:
-            return json.loads(raw)
+            return json.loads(self.clean_json(raw))
         except json.JSONDecodeError:
             return {
                 "project_overview": brief[:200],
@@ -166,7 +177,7 @@ Return a JSON object:
         self.emit_activity(emit, "Review criteria complete. Awaiting milestone updates.", "success")
 
         try:
-            return json.loads(raw)
+            return json.loads(self.clean_json(raw))
         except json.JSONDecodeError:
             return {
                 "quality_criteria": {"senior": [], "visual": [], "junior": []},
@@ -397,6 +408,6 @@ Apply the prepared criteria and the Senior Designer's implementation review. Ret
         self.emit_activity(emit, "All deliverables reviewed and packaged", "success")
 
         try:
-            return json.loads(raw)
+            return json.loads(self.clean_json(raw))
         except json.JSONDecodeError:
             return {"summary": raw, "_raw": raw}

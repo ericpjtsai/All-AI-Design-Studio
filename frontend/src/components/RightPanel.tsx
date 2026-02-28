@@ -4,24 +4,29 @@ import { useStore } from '../store/useStore';
 import { WorkflowPhase, ConfirmationPayload } from '../types';
 import DashboardView from './views/DashboardView';
 import WarRoomView from './views/WarRoomView';
-import ManagersOfficeView from './views/ManagersOfficeView';
 import CheckpointReviewView from './views/CheckpointReviewView';
+import OutputView from './views/OutputView';
+import ScopeConversationView from './views/ScopeConversationView';
 
 // ── View routing ─────────────────────────────────────────────────────────────
 
-type ActiveView = 'dashboard' | 'managers-office' | 'war-room' | 'checkpoint';
+type ActiveView = 'dashboard' | 'scope-conversation' | 'war-room' | 'checkpoint' | 'output';
 
 function getActiveView(
   phase: WorkflowPhase,
   pending: ConfirmationPayload | null,
 ): ActiveView {
-  if (pending) return 'checkpoint';
+  // Scope checkpoint (id='scope') is handled in ScopeConversationView —
+  // don't redirect to CheckpointReviewView for it.
+  const isScopeCheckpoint = pending?.id === 'scope';
+  if (pending && !isScopeCheckpoint) return 'checkpoint';
   switch (phase) {
     case 'briefing':
-    case 'complete':
       return 'dashboard';
+    case 'complete':
+      return 'output';
     case 'scoping':
-      return 'managers-office';
+      return 'scope-conversation';
     case 'designing':
     case 'implementing':
     case 'reviewing':
@@ -33,9 +38,10 @@ function getActiveView(
 
 const ACCENT_COLORS: Record<ActiveView, string> = {
   'dashboard': '#7EACEA',
-  'managers-office': '#7EACEA',
+  'scope-conversation': '#7EACEA',
   'war-room': '#22c55e',
   'checkpoint': '#f59e0b',
+  'output': '#22c55e',
 };
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -48,7 +54,7 @@ const RightPanel: React.FC = () => {
 
   return (
     <div
-      className="flex-1 flex flex-col bg-white overflow-hidden min-w-0"
+      className="flex-1 flex flex-col bg-white overflow-hidden min-w-0 relative"
       style={{
         borderRadius: 32,
         border: '1px solid rgba(0,0,0,0.05)',
@@ -63,12 +69,13 @@ const RightPanel: React.FC = () => {
       />
 
       {/* View content with cross-fade */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden relative">
         <AnimatePresence mode="wait">
           {activeView === 'dashboard' && <DashboardView key="dashboard" />}
-          {activeView === 'managers-office' && <ManagersOfficeView key="office" />}
+          {activeView === 'scope-conversation' && <ScopeConversationView key="scope" />}
           {activeView === 'war-room' && <WarRoomView key="warroom" />}
           {activeView === 'checkpoint' && <CheckpointReviewView key="checkpoint" />}
+          {activeView === 'output' && <OutputView key="output" />}
         </AnimatePresence>
       </div>
     </div>

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+import re
 import time
 from typing import Callable, Awaitable
 
@@ -28,6 +28,17 @@ class BaseAgent:
     def __init__(self, role_index: int, client: genai.Client) -> None:
         self.role_index = role_index
         self.client = client
+
+    # ── JSON cleaning ───────────────────────────────────────────────────────
+
+    @staticmethod
+    def clean_json(raw: str) -> str:
+        """Strip markdown code fences that LLMs often wrap JSON output in."""
+        raw = raw.strip()
+        match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw)
+        if match:
+            return match.group(1).strip()
+        return raw
 
     # ── Emit helpers ────────────────────────────────────────────────────────
 

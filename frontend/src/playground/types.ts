@@ -16,6 +16,11 @@ export interface BoidsParams {
   cohesionRadius: number;
 }
 
+export interface ClarifyingQuestion {
+  question: string;
+  options: string[];
+}
+
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;

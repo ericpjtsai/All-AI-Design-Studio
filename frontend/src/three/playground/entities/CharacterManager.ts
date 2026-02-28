@@ -186,10 +186,11 @@ export class CharacterManager {
         posArray[i * 4 + 3] = 1;
         tempColor.set(colorOverride);
       } else if (i < npcCount) {
-        // NPCs start far off-screen, waiting for rollIn()
-        const angle = ((i - 1) / (npcCount - 1)) * Math.PI * 2;
-        posArray[i * 4 + 0] = Math.cos(angle) * spawnRadius * 3;
-        posArray[i * 4 + 2] = Math.sin(angle) * spawnRadius * 3;
+        // NPCs start inside the world, visible from the beginning
+        const angle = ((i - 1) / (npcCount - 1)) * Math.PI * 2 + Math.random() * 0.4;
+        const radius = this.worldSize * 0.25 + Math.random() * this.worldSize * 0.35;
+        posArray[i * 4 + 0] = Math.cos(angle) * radius;
+        posArray[i * 4 + 2] = Math.sin(angle) * radius;
         posArray[i * 4 + 3] = 1;
         tempColor.set(colorOverride);
       } else {
@@ -219,9 +220,9 @@ export class CharacterManager {
 
     this.agentStateBuffer = new AgentStateBuffer(this.instanceCount);
     this.agentStateBuffer.setState(PLAYER_INDEX, AgentBehavior.FROZEN);
-    // NPCs start frozen off-screen until rollIn() is called
+    // NPCs start as BOIDS immediately — visible from the beginning
     for (let i = 1; i < npcCount; i++) {
-      this.agentStateBuffer.setState(i, AgentBehavior.FROZEN);
+      this.agentStateBuffer.setState(i, AgentBehavior.BOIDS);
     }
 
     this.expressionBuffer = new ExpressionBuffer(this.instanceCount);

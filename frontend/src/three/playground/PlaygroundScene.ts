@@ -198,13 +198,6 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
       }
     });
 
-    // Trigger avatar roll-in when workflow transitions from briefing
-    const sub0 = useStore.subscribe((state, prevState) => {
-      if (prevState.workflowPhase === 'briefing' && state.workflowPhase !== 'briefing') {
-        this.characters.rollIn();
-      }
-    });
-
     const sub1 = usePlaygroundStore.subscribe((state) => {
       this.characters.fadeToAction(state.currentAction);
     });
@@ -237,7 +230,14 @@ Keep your responses extremely brief (1-2 short sentences max) and professional, 
       }
     });
 
-    this.unsubs.push(sub0, sub1, sub2);
+    // Auto-start chat with Design Manager (index 1) when scoping begins
+    const sub3 = useStore.subscribe((state, prevState) => {
+      if (prevState.workflowPhase !== 'scoping' && state.workflowPhase === 'scoping') {
+        usePlaygroundStore.getState().startChat(1);
+      }
+    });
+
+    this.unsubs.push(sub1, sub2, sub3);
   }
 
   private onResize() {

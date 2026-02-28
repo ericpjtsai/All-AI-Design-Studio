@@ -79,7 +79,7 @@ Return a JSON object:
         )
 
         try:
-            flows_data = json.loads(flows_raw)
+            flows_data = json.loads(self.clean_json(flows_raw))
         except json.JSONDecodeError:
             flows_data = {"user_flows": [], "ia_map": {}}
 
@@ -140,7 +140,7 @@ Return a JSON object:
         )
 
         try:
-            wireframes_data = json.loads(wireframes_raw)
+            wireframes_data = json.loads(self.clean_json(wireframes_raw))
         except json.JSONDecodeError:
             wireframes_data = {
                 "wireframes": [],
@@ -234,7 +234,7 @@ Return JSON:
         )
 
         try:
-            result = json.loads(raw)
+            result = json.loads(self.clean_json(raw))
         except json.JSONDecodeError:
             result = {
                 "ux_adherence_score": None,

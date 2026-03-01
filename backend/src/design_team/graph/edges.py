@@ -18,12 +18,12 @@ def _effective_threshold(agent_trust: dict) -> float:
     """Compute the adaptive self-approve threshold from Manager trust level.
 
     manager_trust = 0.5 (default) -> threshold = 0.75 (original behavior)
-    manager_trust = 0.8           -> threshold = 0.50 (auto-approves faster)
+    manager_trust = 0.8           -> threshold = 0.60 (auto-approves faster)
     manager_trust = 1.0           -> threshold = 0.50 (floor)
     manager_trust = 0.0           -> threshold = 1.00 (never self-approves)
     """
     manager_trust = agent_trust.get(0, 0.5)
-    return max(0.5, 1.0 - manager_trust)
+    return max(0.5, 1.0 - manager_trust * 0.5)
 
 
 def should_checkpoint_1(state: DesignTeamState) -> str:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 import time
 from typing import Callable, Awaitable
@@ -33,12 +34,35 @@ class BaseAgent:
 
     @staticmethod
     def clean_json(raw: str) -> str:
-        """Strip markdown code fences that LLMs often wrap JSON output in."""
+        """Clean and repair LLM JSON responses; always returns a JSON object string.
+
+        json-repair handles: trailing commas, unescaped chars, truncated JSON, etc.
+        We additionally unwrap any top-level JSON array — all our prompts ask for
+        a single object, so an array is always a wrapping mistake by the LLM.
+        """
+        import json as _json
+        from json_repair import repair_json  # type: ignore[import]
+
         raw = raw.strip()
-        match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw)
-        if match:
-            return match.group(1).strip()
-        return raw
+
+        # Strip only the OUTER code fence using anchored patterns
+        if raw.startswith("```"):
+            raw = re.sub(r"^```(?:json|JSON)?\s*", "", raw)
+            raw = re.sub(r"\s*```\s*$", "", raw)
+            raw = raw.strip()
+
+        repaired = repair_json(raw, return_objects=False)
+
+        # Unwrap if the LLM wrapped the object in a JSON array: [{...}] → {...}
+        try:
+            parsed = _json.loads(repaired)
+            if isinstance(parsed, list):
+                first = next((item for item in parsed if isinstance(item, dict)), None)
+                return _json.dumps(first if first is not None else {})
+        except Exception:
+            pass
+
+        return repaired
 
     # ── Emit helpers ────────────────────────────────────────────────────────
 
@@ -81,29 +105,51 @@ class BaseAgent:
         emit: EmitFn,
         activity_prefix: str = "Thinking",
         max_tokens: int = 8096,
+        max_retries: int = 3,
+        on_chunk: Callable[[str], None] | None = None,
     ) -> str:
         """Stream a Gemini response, emitting activity dots while streaming.
 
+        Retries up to max_retries times on transient errors before raising.
         Returns the full response text.
         """
-        full_text = ""
-        last_activity_at = time.monotonic()
+        last_exc: Exception | None = None
+        for attempt in range(max_retries):
+            try:
+                full_text = ""
+                last_activity_at = time.monotonic()
 
-        async for chunk in await self.client.aio.models.generate_content_stream(
-            model=MODEL,
-            contents=user,
-            config=genai.types.GenerateContentConfig(
-                system_instruction=system,
-                max_output_tokens=max_tokens,
-            ),
-        ):
-            if chunk.text:
-                full_text += chunk.text
+                async for chunk in await self.client.aio.models.generate_content_stream(
+                    model=MODEL,
+                    contents=user,
+                    config=genai.types.GenerateContentConfig(
+                        system_instruction=system,
+                        max_output_tokens=max_tokens,
+                    ),
+                ):
+                    if chunk.text:
+                        full_text += chunk.text
+                        if on_chunk:
+                            on_chunk(chunk.text)
 
-            # Emit a brief activity pulse every ~1.5 s to show liveness
-            now = time.monotonic()
-            if now - last_activity_at > 1.5:
-                self.emit_activity(emit, f"{activity_prefix}…", "info")
-                last_activity_at = now
+                    now = time.monotonic()
+                    if now - last_activity_at > 1.5:
+                        self.emit_activity(emit, f"{activity_prefix}…", "info")
+                        last_activity_at = now
 
-        return full_text.strip()
+                result = full_text.strip()
+                print(f"[LLM:{activity_prefix}] {len(result)} chars | max_tokens={max_tokens}")
+                return result
+
+            except Exception as exc:
+                last_exc = exc
+                wait = 2 ** attempt  # 1 s, 2 s, 4 s
+                print(f"[LLM:{activity_prefix}] attempt {attempt + 1} failed: {exc!r} — retrying in {wait}s")
+                self.emit_activity(
+                    emit,
+                    f"{activity_prefix}: error, retrying… ({exc.__class__.__name__})",
+                    "warn",
+                )
+                await asyncio.sleep(wait)
+
+        raise RuntimeError(f"LLM call failed after {max_retries} attempts") from last_exc

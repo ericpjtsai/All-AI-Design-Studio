@@ -58,27 +58,30 @@ Rules for clarifying_questions:
             user=user_prompt,
             emit=emit,
             activity_prefix="Analyzing brief",
-            max_tokens=2048,
+            max_tokens=4096,
         )
 
         self.emit_status(emit, "working", "Synthesizing scope document", 0.6)
         self.emit_activity(emit, "Scope document ready for review", "success")
 
         try:
-            return json.loads(self.clean_json(raw))
-        except json.JSONDecodeError:
-            return {
-                "project_overview": brief[:200],
-                "target_users": "To be clarified",
-                "in_scope": [],
-                "out_of_scope": [],
-                "visual_direction": "To be clarified",
-                "technical_constraints": "To be clarified",
-                "priority_stack": [],
-                "success_criteria": [],
-                "clarifying_questions": [],
-                "_raw": raw,
-            }
+            result = json.loads(self.clean_json(raw))
+            if isinstance(result, dict):
+                return result
+        except Exception:
+            pass
+        return {
+            "project_overview": brief[:200],
+            "target_users": "To be clarified",
+            "in_scope": [],
+            "out_of_scope": [],
+            "visual_direction": "To be clarified",
+            "technical_constraints": "To be clarified",
+            "priority_stack": [],
+            "success_criteria": [],
+            "clarifying_questions": [],
+            "_raw": raw,
+        }
 
     # ── Phase 0b: kickoff — align team on design direction ────────────────────
 
@@ -113,20 +116,23 @@ Return a JSON object:
             user=user_prompt,
             emit=emit,
             activity_prefix="Briefing team",
-            max_tokens=512,
+            max_tokens=1024,
         )
 
         self.emit_status(emit, "reviewing", "Kickoff complete — team is now designing", 0.3)
         self.emit_activity(emit, "Direction brief delivered. Monitoring team progress…", "success")
 
         try:
-            result = json.loads(raw)
-            summary = result.get("kickoff_summary", "")
-            if summary:
-                self.emit_activity(emit, f"Kickoff: {summary[:120]}")
-            return result
-        except json.JSONDecodeError:
-            return {"design_approach": raw[:200], "_raw": raw}
+            result = json.loads(self.clean_json(raw))
+            if not isinstance(result, dict):
+                result = {}
+        except Exception:
+            result = {}
+
+        summary = result.get("kickoff_summary", "")
+        if summary:
+            self.emit_activity(emit, f"Kickoff: {summary[:120]}")
+        return result or {"design_approach": raw[:200], "_raw": raw}
 
     # ── Phase 1 (concurrent): ponder optimization while designers work ────────
 
@@ -170,23 +176,26 @@ Return a JSON object:
             user=user_prompt,
             emit=emit,
             activity_prefix="Pondering",
-            max_tokens=1024,
+            max_tokens=2048,
         )
 
         self.emit_status(emit, "reviewing", "Criteria ready — monitoring team progress…", 0.7)
         self.emit_activity(emit, "Review criteria complete. Awaiting milestone updates.", "success")
 
         try:
-            return json.loads(self.clean_json(raw))
-        except json.JSONDecodeError:
-            return {
-                "quality_criteria": {"senior": [], "visual": [], "junior": []},
-                "risk_areas": [],
-                "skill_evolution_directives": {"senior": "", "visual": "", "junior": ""},
-                "junior_brief_addendum": raw[:400],
-                "optimization_notes": raw[:200],
-                "_raw": raw,
-            }
+            result = json.loads(self.clean_json(raw))
+            if isinstance(result, dict):
+                return result
+        except Exception:
+            pass
+        return {
+            "quality_criteria": {"senior": [], "visual": [], "junior": []},
+            "risk_areas": [],
+            "skill_evolution_directives": {"senior": "", "visual": "", "junior": ""},
+            "junior_brief_addendum": raw[:400],
+            "optimization_notes": raw[:200],
+            "_raw": raw,
+        }
 
     # ── Milestone review — called after each agent checkpoint ─────────────────
 
@@ -232,16 +241,23 @@ Only set needs_human=true for genuine quality risks or scope deviations that req
             user=user_prompt,
             emit=emit,
             activity_prefix=f"Checking {agent_name}",
-            max_tokens=256,
+            max_tokens=768,
         )
 
         try:
-            result = json.loads(raw)
-        except json.JSONDecodeError:
+            result = json.loads(self.clean_json(raw))
+            if not isinstance(result, dict):
+                result = {}
+        except Exception:
+            result = {}
+        if not result:
             result = {"ok": True, "score": 7, "feedback": "", "needs_human": False, "reason": ""}
 
-        score = result.get("score", 7)
-        ok = result.get("ok", True)
+        try:
+            score = int(result.get("score", 7))
+        except (TypeError, ValueError):
+            score = 7
+        ok = bool(result.get("ok", True))
         level = "success" if ok and score >= 7 else "warn" if score >= 5 else "error"
         feedback_preview = result.get("feedback", "")[:80]
         self.emit_activity(
@@ -267,8 +283,10 @@ Only set needs_human=true for genuine quality risks or scope deviations that req
         flows_count = len(senior_output.get("user_flows", []))
         screens_count = len(senior_output.get("wireframes", []))
         handoff = str(senior_output.get("handoff_notes", ""))[:250]
-        token_keys = list(visual_output.get("design_tokens", {}).keys())
-        comp_styles = list(visual_output.get("component_styles", {}).keys())[:6]
+        dt = visual_output.get("design_tokens", {})
+        token_keys = list(dt.keys()) if isinstance(dt, dict) else []
+        cs = visual_output.get("component_styles", {})
+        comp_styles = list(cs.keys())[:6] if isinstance(cs, dict) else []
 
         user_prompt = f"""Cross-team design critique. Check UX ↔ design system alignment.
 
@@ -300,14 +318,18 @@ Return a JSON object:
             user=user_prompt,
             emit=emit,
             activity_prefix="Cross-critiquing",
-            max_tokens=512,
+            max_tokens=1024,
         )
 
         self.emit_status(emit, "reviewing", "Cross-critique complete", 0.65)
 
         try:
-            result = json.loads(raw)
-        except json.JSONDecodeError:
+            result = json.loads(self.clean_json(raw))
+            if not isinstance(result, dict):
+                result = {}
+        except Exception:
+            result = {}
+        if not result:
             result = {
                 "alignment_score": 8,
                 "alignment_issues": [],
@@ -318,7 +340,10 @@ Return a JSON object:
                 "_raw": raw,
             }
 
-        score = result.get("alignment_score", 8)
+        try:
+            score = int(result.get("alignment_score", 8))
+        except (TypeError, ValueError):
+            score = 8
         summary = result.get("summary", "")
         self.emit_activity(
             emit,
@@ -345,9 +370,13 @@ Return a JSON object:
 
         criteria_section = ""
         if optimization_prep:
-            criteria = optimization_prep.get("quality_criteria", {})
+            criteria_raw = optimization_prep.get("quality_criteria", {})
+            criteria = criteria_raw if isinstance(criteria_raw, dict) else {}
             risk_areas = optimization_prep.get("risk_areas", [])
-            skill_dirs = optimization_prep.get("skill_evolution_directives", {})
+            if not isinstance(risk_areas, list):
+                risk_areas = []
+            skill_dirs_raw = optimization_prep.get("skill_evolution_directives", {})
+            skill_dirs = skill_dirs_raw if isinstance(skill_dirs_raw, dict) else {}
             criteria_section = f"""
 QUALITY CRITERIA (prepared in advance):
 Senior: {criteria.get("senior", [])}
@@ -408,6 +437,9 @@ Apply the prepared criteria and the Senior Designer's implementation review. Ret
         self.emit_activity(emit, "All deliverables reviewed and packaged", "success")
 
         try:
-            return json.loads(self.clean_json(raw))
-        except json.JSONDecodeError:
-            return {"summary": raw, "_raw": raw}
+            result = json.loads(self.clean_json(raw))
+            if isinstance(result, dict):
+                return result
+        except Exception:
+            pass
+        return {"summary": raw, "_raw": raw}

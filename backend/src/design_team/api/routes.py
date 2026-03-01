@@ -68,6 +68,15 @@ async def confirm(session_id: str, body: ConfirmRequest) -> ConfirmResponse:
     return ConfirmResponse(ok=True)
 
 
+@router.get("/api/sessions/{session_id}/state")
+async def get_session_state(session_id: str) -> dict:
+    """Lightweight state snapshot for frontend recovery after SSE disconnection."""
+    state = _manager.get_session_state(session_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return state
+
+
 @router.get("/api/sessions/{session_id}/outputs")
 async def get_outputs(session_id: str) -> dict:
     outputs = _manager.get_outputs(session_id)

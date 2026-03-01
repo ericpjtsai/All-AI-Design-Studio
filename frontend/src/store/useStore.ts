@@ -60,10 +60,14 @@ interface StudioStore {
   sessionId: string | null;
   /** Non-null when the session or connection has errored */
   sessionError: string | null;
+  /** ID of the most-recently confirmed checkpoint — used to suppress stale re-emissions */
+  _lastConfirmedId: string | null;
   /** Per-agent trust levels (0.0–1.0). Index maps to AGENTS array. */
   agentTrust: number[];
   /** Latest design outputs fetched from backend */
   designOutputs: DesignOutputs | null;
+  /** Accumulated HTML prototype streamed in real-time from Junior Designer */
+  streamingPrototype: string;
 
   // Public actions
   startSession: (brief: string) => Promise<void>;
@@ -80,6 +84,7 @@ interface StudioStore {
   _setComplete: () => void;
   _setSessionError: (message: string) => void;
   _handleDesignOutput: (payload: { output_type: string; data: Record<string, unknown> }) => void;
+  _appendStreamingPrototype: (delta: string) => void;
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -91,8 +96,10 @@ export const useStore = create<StudioStore>()((set, get) => ({
   workflowPhase: 'briefing',
   sessionId: null,
   sessionError: null,
+  _lastConfirmedId: null,
   agentTrust: [0.5, 0.5, 0.5, 0.5],
   designOutputs: null,
+  streamingPrototype: '',
 
   // ── UI helpers ─────────────────────────────────────────────────────────────
 
@@ -122,7 +129,14 @@ export const useStore = create<StudioStore>()((set, get) => ({
 
   _setPhase: (phase) => set({ workflowPhase: phase }),
 
-  _setPendingConfirmation: (payload) => set({ pendingConfirmation: payload }),
+  _setPendingConfirmation: (payload) => {
+    // Suppress a re-emitted prompt for a checkpoint the user already confirmed.
+    // This prevents the SSE reconnect synthetic burst from resurfacing a stale
+    // confirmation dialog after the user has already clicked approve/revise.
+    if (payload !== null && payload.id === get()._lastConfirmedId) return;
+    // A genuinely new checkpoint (different id) clears the suppression guard.
+    set({ pendingConfirmation: payload, _lastConfirmedId: null });
+  },
 
   _setComplete: () => {
     const { _setPhase } = get();
@@ -131,6 +145,9 @@ export const useStore = create<StudioStore>()((set, get) => ({
       get()._updateAgent({ agentIndex: a.index, status: 'complete', isActive: false }),
     );
   },
+
+  _appendStreamingPrototype: (delta) =>
+    set((s) => ({ streamingPrototype: s.streamingPrototype + delta })),
 
   _handleDesignOutput: ({ output_type, data }) =>
     set((s) => ({
@@ -168,11 +185,13 @@ export const useStore = create<StudioStore>()((set, get) => ({
     set({
       sessionId: null,
       sessionError: null,
+      _lastConfirmedId: null,
       workflowPhase: 'briefing',
       activities: [],
       pendingConfirmation: null,
       agentStates: initialAgentStates,
       designOutputs: null,
+      streamingPrototype: '',
     }),
 
   // ── startSession — POST /api/sessions to kick off real backend ─────────────
@@ -217,7 +236,9 @@ export const useStore = create<StudioStore>()((set, get) => ({
   confirmDecision: (id, action, feedback) => {
     const { sessionId, workflowPhase, _updateAgent, _addActivity } = get();
 
-    set({ pendingConfirmation: null });
+    // Record this id as confirmed so that a stale SSE re-emission of the same
+    // confirmation_prompt (from the reconnect synthetic burst) is suppressed.
+    set({ pendingConfirmation: null, _lastConfirmedId: id });
 
     // ── LIVE MODE: forward to backend ────────────────────────────────────────
     if (sessionId) {

@@ -210,8 +210,10 @@ async def designing_node(state: DesignTeamState, config: RunnableConfig) -> dict
     if opt_notes:
         emit("activity", {"agentIndex": 0, "message": f"Insight: {opt_notes[:140]}", "level": "info"})
     risk_areas = opt_prep.get("risk_areas", [])
-    if risk_areas:
-        emit("activity", {"agentIndex": 0, "message": f"Risk areas: {', '.join(risk_areas[:3])}", "level": "warn"})
+    if isinstance(risk_areas, list) and risk_areas:
+        emit("activity", {"agentIndex": 0, "message": f"Risk areas: {', '.join(str(r) for r in risk_areas[:3])}", "level": "warn"})
+    elif isinstance(risk_areas, str) and risk_areas:
+        emit("activity", {"agentIndex": 0, "message": f"Risk areas: {risk_areas[:120]}", "level": "warn"})
 
     # Push design outputs to frontend in real-time
     emit("design_output", {"output_type": "senior_output", "data": senior_out})
@@ -328,8 +330,11 @@ async def checkpoint_2_node(state: DesignTeamState, config: RunnableConfig) -> d
     confidence = state.get("confidence", 0.5)
     junior_out = state.get("junior_output", {})
 
-    comp_count = len(junior_out.get("components", []))
-    comp_names = [c.get("name", "") for c in junior_out.get("components", [])[:6]]
+    components_val = junior_out.get("components", [])
+    if not isinstance(components_val, list):
+        components_val = []
+    comp_count = len(components_val)
+    comp_names = [c.get("name", "") for c in components_val[:6] if isinstance(c, dict)]
     context = (
         f"COMPONENTS BUILT ({comp_count}):\n"
         + "\n".join(f"  \u2022 {n}" for n in comp_names)

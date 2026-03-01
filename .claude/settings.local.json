@@ -35,7 +35,17 @@
       "Bash(uv run python -c \"from design_team.api.chat import router; print\\(''Chat router OK:'', [r.path for r in router.routes]\\)\")",
       "Bash(uv run python -c \"from design_team.main import app; routes = [r.path for r in app.routes]; print\\(''All routes:'', routes\\)\")",
       "Bash(uv run python -c \"from design_team.main import app; routes = [r.path for r in app.routes]; print\\(''Routes:'', routes\\); print\\(''Total:'', len\\(routes\\)\\)\")",
-      "Bash(git -C /Users/chuang/Desktop/All-AI-Design-Studio log --oneline --all)"
+      "Bash(git -C /Users/chuang/Desktop/All-AI-Design-Studio log --oneline --all)",
+      "Bash(grep -n \"BuildPhaseView\\\\|DesignPhaseView\\\\|ReviewPhaseView\" /Users/chuang/Desktop/All-AI-Design-Studio/frontend/src/components/views/*.tsx /Users/chuang/Desktop/All-AI-Design-Studio/frontend/src/**/*.tsx)",
+      "Bash(curl -s http://localhost:8001/api/sessions -X POST -H \"Content-Type: application/json\" -d '{\"\"brief\"\":\"\"Build a simple dashboard\"\",\"\"agent_trust\"\":{}}')",
+      "Bash(curl -s --max-time 30 -N \"http://localhost:8001/api/sessions/46f247d6/events\")",
+      "Bash(grep -n \"json.loads\\(\" /Users/chuang/Desktop/All-AI-Design-Studio/backend/src/design_team/agents/*.py)",
+      "Bash(.venv/bin/python3 -:*)",
+      "Bash(curl -s http://localhost:8001/api/sessions -X POST -H \"Content-Type: application/json\" -d '{\"\"brief\"\":\"\"test\"\",\"\"agent_trust\"\":{}}')",
+      "Bash(python3 -c \":*)",
+      "Bash(python3 -c \"from src.design_team.agents.base import BaseAgent; b = BaseAgent.__new__\\(BaseAgent\\); print\\(''clean_json test:'', b.clean_json\\(''\\\\`\\\\`\\\\`json\\\\n{\"\"k\"\": \"\"v with\\\\nreal newline\"\"}\\\\n\\\\`\\\\`\\\\`''\\)\\)\")",
+      "Bash(uv add json-repair)",
+      "Bash(uv run python3 -c \":*)"
     ]
   }
 }

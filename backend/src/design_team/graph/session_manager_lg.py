@@ -42,6 +42,13 @@ class LGSessionData:
     # Internal signaling for human checkpoint bridge
     _resume_event: asyncio.Event = field(default_factory=asyncio.Event)
     _resume_data: dict | None = None
+    # ── Reconnect recovery cache ─────────────────────────────────────────────
+    # Updated in real-time as events flow through stream_events().
+    # Re-emitted as synthetic events when a new SSE connection opens so that
+    # reconnecting clients instantly see the current phase and any pending
+    # confirmation prompt — even if those events were consumed by a dead connection.
+    _current_phase: str = "scoping"
+    _last_confirmation_prompt: dict | None = None
 
 
 class LangGraphSessionManager:
@@ -90,18 +97,53 @@ class LangGraphSessionManager:
             return False
         data._resume_data = {"action": action, "feedback": feedback or ""}
         data.status = "running"
+        # Clear cached prompt immediately so reconnecting clients don't see a
+        # stale confirmation_prompt after the user has already confirmed.
+        data._last_confirmation_prompt = None
+        # Also push a confirmation_cleared event so any already-connected client
+        # (or a client that reconnects before phase_change arrives) clears the
+        # pending confirmation UI straight away.
+        data.queue.put_nowait({"event": "confirmation_cleared", "data": {}})
         data._resume_event.set()
         return True
 
     async def stream_events(self, session_id: str) -> AsyncGenerator[dict, None]:
-        """Drain the SSE queue — identical to old SessionManager."""
+        """Drain the SSE queue, with reconnect-safe state recovery.
+
+        On every new connection (including reconnects after a drop) we
+        immediately emit synthetic events so the client is always in sync:
+
+          1. phase_change  — the current workflow phase (cached in-memory)
+          2. confirmation_prompt — the last pending prompt, if still awaiting
+
+        This means a reconnecting client never stays stuck because a critical
+        event was consumed by the dead previous connection.
+        """
         data = self._sessions.get(session_id)
         if data is None:
             yield {"event": "session_error", "data": {"message": "Session not found"}}
             return
+
+        # ── Synthetic recovery burst (always safe to re-emit) ────────────────
+        yield {"event": "phase_change", "data": {"phase": data._current_phase}}
+        if data.status == "awaiting_confirm" and data._last_confirmation_prompt:
+            yield {"event": "confirmation_prompt", "data": data._last_confirmation_prompt}
+
+        # ── Normal queue drain ────────────────────────────────────────────────
         while True:
             try:
                 event = await asyncio.wait_for(data.queue.get(), timeout=30.0)
+
+                # Update in-memory cache so future reconnects get fresh values
+                if event["event"] == "phase_change":
+                    phase = event["data"]
+                    if isinstance(phase, dict):
+                        data._current_phase = phase.get("phase", data._current_phase)
+                elif event["event"] == "confirmation_prompt":
+                    prompt = event["data"]
+                    if isinstance(prompt, dict):
+                        data._last_confirmation_prompt = prompt
+
                 yield event
                 data.queue.task_done()
                 if event["event"] in ("session_complete", "session_error"):
@@ -114,6 +156,40 @@ class LangGraphSessionManager:
             {"session_id": s.session_id, "status": s.status, "brief": s.brief[:80]}
             for s in self._sessions.values()
         ]
+
+    def get_session_state(self, session_id: str) -> dict | None:
+        """Return lightweight state snapshot for frontend recovery after SSE loss."""
+        data = self._sessions.get(session_id)
+        if data is None:
+            return None
+
+        current_phase = "scoping"
+        pending_checkpoint_id = None
+
+        config = {"configurable": {"thread_id": data.thread_id}}
+        try:
+            snapshot = self._graph.get_state(config)
+            state_values = snapshot.values
+            if isinstance(state_values, dict):
+                current_phase = state_values.get("current_phase", "scoping")
+
+            # If graph is interrupted, extract the checkpoint_id from interrupt value
+            for task in snapshot.tasks:
+                for intr in getattr(task, "interrupts", []) or []:
+                    val = intr.value if hasattr(intr, "value") else intr
+                    if isinstance(val, dict):
+                        pending_checkpoint_id = val.get("checkpoint_id")
+                        break
+                if pending_checkpoint_id:
+                    break
+        except Exception:
+            pass
+
+        return {
+            "status": data.status,
+            "current_phase": current_phase,
+            "pending_checkpoint_id": pending_checkpoint_id,
+        }
 
     def get_outputs(self, session_id: str) -> dict | None:
         """Read outputs from the latest LangGraph checkpoint state."""

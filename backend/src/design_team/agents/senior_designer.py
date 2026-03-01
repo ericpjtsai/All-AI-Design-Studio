@@ -57,7 +57,7 @@ Return a JSON object:
     {{
       "id": "flow_01",
       "title": "string",
-      "mermaid_syntax": "flowchart TD\\n  A[Start] --> B[Step]"
+      "steps": ["Step 1", "Step 2", "Step 3"]
     }}
   ],
   "ia_map": {{
@@ -75,15 +75,21 @@ Return a JSON object:
             user=flows_prompt,
             emit=emit,
             activity_prefix="Mapping flows",
-            max_tokens=2048,
+            max_tokens=3072,
         )
 
         try:
             flows_data = json.loads(self.clean_json(flows_raw))
-        except json.JSONDecodeError:
+            if not isinstance(flows_data, dict):
+                flows_data = {"user_flows": [], "ia_map": {}}
+        except Exception as e:
+            print(f"[Senior flows JSON error] {e} | first 300: {flows_raw[:300]}")
             flows_data = {"user_flows": [], "ia_map": {}}
 
         flows_count = len(flows_data.get("user_flows", []))
+        ia_map_val = flows_data.get('ia_map', {})
+        ia_map_keys = list(ia_map_val.keys()) if isinstance(ia_map_val, dict) else []
+        print(f"[Senior] flows_count={flows_count} | ia_map_keys={ia_map_keys} | top_keys={list(flows_data.keys())}")
         self.emit_activity(emit, f"{flows_count} user flow(s) and IA map complete.", "success")
         self.emit_status(emit, "working", "User flows done — awaiting Manager review", 0.35)
 
@@ -92,7 +98,7 @@ Return a JSON object:
         if on_milestone:
             summary = (
                 f"{flows_count} user flow(s) covering primary journey '{primary_journey}'. "
-                f"IA map root sections: {list(flows_data.get('ia_map', {}).keys())}"
+                f"IA map root sections: {ia_map_keys}"
             )
             feedback_1 = await on_milestone("user_flows_and_ia", summary)
             if feedback_1:
@@ -136,12 +142,15 @@ Return a JSON object:
             user=wireframes_prompt,
             emit=emit,
             activity_prefix="Wireframing",
-            max_tokens=3072,
+            max_tokens=4096,
         )
 
         try:
             wireframes_data = json.loads(self.clean_json(wireframes_raw))
-        except json.JSONDecodeError:
+            if not isinstance(wireframes_data, dict):
+                wireframes_data = {"wireframes": [], "interaction_specs": {}, "handoff_notes": ""}
+        except Exception as e:
+            print(f"[Senior wireframes JSON error] {e} | first 300: {wireframes_raw[:300]}")
             wireframes_data = {
                 "wireframes": [],
                 "interaction_specs": {},
@@ -183,9 +192,12 @@ Return a JSON object:
         self.emit_activity(emit, "Auditing component implementation against wireframes…")
 
         components = junior_output.get("components", [])
+        if not isinstance(components, list):
+            components = []
         comp_summary = [
             {"name": c.get("name", ""), "code_snippet": c.get("tsx_code", "")[:300]}
             for c in components[:4]
+            if isinstance(c, dict)
         ]
         token_keys = list((visual_output.get("design_tokens") or {}).keys())
         component_styles_keys = list((visual_output.get("component_styles") or {}).keys())
@@ -230,12 +242,17 @@ Return JSON:
             user=review_prompt,
             emit=emit,
             activity_prefix="Reviewing implementation",
-            max_tokens=1024,
+            max_tokens=2048,
         )
 
         try:
             result = json.loads(self.clean_json(raw))
-        except json.JSONDecodeError:
+            if not isinstance(result, dict):
+                result = {}
+        except Exception:
+            result = {}
+
+        if not result:
             result = {
                 "ux_adherence_score": None,
                 "token_usage_score": None,
@@ -245,17 +262,23 @@ Return JSON:
                 "overall_assessment": raw[:400],
             }
 
-        ux_score = result.get("ux_adherence_score", "N/A")
-        token_score = result.get("token_usage_score", "N/A")
+        try:
+            ux_score = int(result.get("ux_adherence_score", 0))
+        except (TypeError, ValueError):
+            ux_score = 0
+        try:
+            token_score = int(result.get("token_usage_score", 0))
+        except (TypeError, ValueError):
+            token_score = 0
         self.emit_activity(
             emit,
             f"Implementation review: UX adherence {ux_score}/10 · Token usage {token_score}/10.",
-            "success" if (ux_score or 0) >= 7 else "warn",
+            "success" if ux_score >= 7 else "warn",
         )
 
         issues = result.get("component_issues", [])
-        if issues:
-            self.emit_activity(emit, f"Issues found: {'; '.join(issues[:2])}", "warn")
+        if isinstance(issues, list) and issues:
+            self.emit_activity(emit, f"Issues found: {'; '.join(str(i) for i in issues[:2])}", "warn")
 
         self.emit_status(emit, "complete", "Implementation review complete", 1.0, False)
         return result

@@ -8,6 +8,9 @@ import {
   GitMerge,
   Palette,
   Code2,
+  Maximize2,
+  X,
+  Download,
 } from 'lucide-react';
 
 // ── Agent definitions ─────────────────────────────────────────────────────────
@@ -161,6 +164,20 @@ const ReviewPhaseView: React.FC = () => {
   const [selectedTarget, setSelectedTarget] = useState<AgentTarget>('junior');
   const [instruction, setInstruction] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
+
+  const htmlPrototype = designOutputs?.junior_output?.html_prototype as string | undefined;
+
+  const handleExportProto = () => {
+    if (!htmlPrototype) return;
+    const blob = new Blob([htmlPrototype], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'prototype.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Use real review scores from backend, fall back to sensible defaults
   const review = (designOutputs?.review ?? {}) as Record<string, unknown>;
@@ -179,13 +196,10 @@ const ReviewPhaseView: React.FC = () => {
       ?? '8.5';
 
   // Deliverable counts — parse from context string first, fall back to outputs
-  const rawCode = designOutputs?.junior_output?.react_code;
-  const componentCode = typeof rawCode === 'string' ? rawCode : null;
+  const rawComponents = designOutputs?.junior_output?.components;
   const componentCount =
     parseCtxInt(ctx, /(\d+)\s+React\s+component/i) ??
-    (componentCode
-      ? (componentCode.match(/^export\s+(const|default|function)/gm) ?? []).length
-      : null);
+    (Array.isArray(rawComponents) ? (rawComponents as unknown[]).length : null);
 
   const rawTokens = designOutputs?.visual_output?.design_tokens;
   const tokenCount =
@@ -245,18 +259,19 @@ const ReviewPhaseView: React.FC = () => {
 
   return (
     <motion.div
-      className="h-full overflow-y-auto"
+      className="h-full flex flex-col relative"
       style={{ background: '#fafafa' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
     >
+      {/* Scrollable content */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="p-4 space-y-3"
+        className="flex-1 overflow-y-auto p-4 space-y-3"
       >
             {/* ── Header ────────────────────────────────────────────────────── */}
             <div>
@@ -293,51 +308,84 @@ const ReviewPhaseView: React.FC = () => {
               ))}
             </div>
 
-            {/* ── Split view: wireframe + scores ───────────────────────────── */}
-            <div className="grid grid-cols-2 gap-2">
-              {/* Left: wireframe preview */}
+            {/* ── Full-width preview ───────────────────────────────────────── */}
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.07)', position: 'relative' }}
+            >
+              {/* Preview header bar */}
               <div
-                className="rounded-xl p-2 overflow-hidden"
-                style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.07)' }}
+                className="flex items-center justify-between px-3 py-2"
+                style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}
               >
-                <div
-                  style={{ fontSize: 9, color: '#aaa', marginBottom: 5, letterSpacing: '0.06em' }}
-                >
-                  PREVIEW
-                </div>
-                <DashboardWireframe />
+                <span style={{ fontSize: 9, color: '#aaa', letterSpacing: '0.08em', fontFamily: 'ui-monospace, monospace' }}>
+                  {htmlPrototype ? 'LIVE PROTOTYPE' : 'WIREFRAME PREVIEW'}
+                </span>
+                {htmlPrototype && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={handleExportProto}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-md"
+                      style={{ background: '#f4f5f7', border: 'none', cursor: 'pointer', fontSize: 9, color: '#6b7280' }}
+                    >
+                      <Download size={8} />
+                      export
+                    </button>
+                    <button
+                      onClick={() => setPreviewExpanded(true)}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-md"
+                      style={{ background: '#111', border: 'none', cursor: 'pointer', fontSize: 9, color: '#fff' }}
+                    >
+                      <Maximize2 size={8} />
+                      expand
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {/* Right: quality scores */}
-              <div
-                className="rounded-xl p-2.5 space-y-2"
-                style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.07)' }}
-              >
-                <div
-                  style={{ fontSize: 9, color: '#aaa', marginBottom: 5, letterSpacing: '0.06em' }}
-                >
-                  QUALITY
+              {/* Preview content */}
+              {htmlPrototype ? (
+                <div style={{ position: 'relative', height: 200 }}>
+                  <iframe
+                    srcDoc={htmlPrototype}
+                    className="w-full h-full border-0 block"
+                    sandbox="allow-scripts allow-same-origin"
+                    title="Prototype Preview"
+                  />
+                  {/* Click-to-expand overlay hint */}
+                  <div
+                    onClick={() => setPreviewExpanded(true)}
+                    className="absolute inset-0 flex items-end justify-center pb-3 opacity-0 hover:opacity-100 transition-opacity"
+                    style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.3) 0%, transparent 60%)', cursor: 'pointer' }}
+                  >
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white" style={{ background: 'rgba(0,0,0,0.6)', fontSize: 10, fontWeight: 600, backdropFilter: 'blur(4px)' }}>
+                      <Maximize2 size={10} />
+                      Click to expand
+                    </span>
+                  </div>
                 </div>
+              ) : (
+                <div className="px-3 pb-3 pt-1">
+                  <DashboardWireframe />
+                </div>
+              )}
+            </div>
+
+            {/* ── Quality scores (full-width) ───────────────────────────────── */}
+            <div
+              className="rounded-xl p-3"
+              style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.07)' }}
+            >
+              <div className="flex items-center justify-between mb-2.5">
+                <span style={{ fontSize: 9, color: '#aaa', letterSpacing: '0.08em', fontFamily: 'ui-monospace, monospace' }}>QUALITY</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#111', fontFamily: 'ui-monospace, monospace' }}>
+                  {overallScore}<span style={{ fontSize: 9, color: '#999', fontWeight: 500 }}>/10</span>
+                </span>
+              </div>
+              <div className="space-y-2">
                 {qualityScores.map((s) => (
                   <ScoreBar key={s.label} label={s.label} score={s.score} />
                 ))}
-                <div
-                  className="flex items-center justify-between pt-1"
-                  style={{ borderTop: '1px solid #f1f5f9' }}
-                >
-                  <span style={{ fontSize: 9.5, color: '#666' }}>Overall</span>
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 800,
-                      color: '#111',
-                      fontFamily: 'ui-monospace, monospace',
-                    }}
-                  >
-                    {overallScore}
-                    <span style={{ fontSize: 9, color: '#999', fontWeight: 500 }}>/10</span>
-                  </span>
-                </div>
               </div>
             </div>
 
@@ -349,29 +397,6 @@ const ReviewPhaseView: React.FC = () => {
                 margin: '4px 0',
               }}
             />
-
-            {/* ── APPROVE button ────────────────────────────────────────────── */}
-            <motion.button
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleApprove}
-              disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl py-3.5"
-              style={{
-                background: 'linear-gradient(135deg, #16a34a, #15803d)',
-                color: '#fff',
-                fontSize: 13,
-                fontWeight: 700,
-                border: 'none',
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                opacity: isSubmitting ? 0.6 : 1,
-                boxShadow: '0 4px 20px #22c55e30',
-                letterSpacing: '0.01em',
-              }}
-            >
-              <CheckCircle2 size={16} />
-              Approve &amp; Package
-            </motion.button>
 
             {/* ── God Mode section ──────────────────────────────────────────── */}
             <div
@@ -562,6 +587,90 @@ const ReviewPhaseView: React.FC = () => {
               </div>
             </div>
       </motion.div>
+
+      {/* ── Sticky approve footer — always visible ───────────────────────── */}
+      <div
+        className="shrink-0 px-4 pb-4 pt-3"
+        style={{ borderTop: '1px solid rgba(0,0,0,0.06)', background: '#fafafa' }}
+      >
+        <motion.button
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleApprove}
+          disabled={isSubmitting}
+          className="w-full flex items-center justify-center gap-2 rounded-2xl py-3.5"
+          style={{
+            background: isSubmitting
+              ? '#d1fae5'
+              : 'linear-gradient(135deg, #16a34a, #15803d)',
+            color: isSubmitting ? '#6b7280' : '#fff',
+            fontSize: 13,
+            fontWeight: 700,
+            border: 'none',
+            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            boxShadow: isSubmitting ? 'none' : '0 4px 20px #22c55e30',
+            letterSpacing: '0.01em',
+            transition: 'all 0.2s',
+          }}
+        >
+          <CheckCircle2 size={16} />
+          {isSubmitting ? 'Packaging…' : 'Approve & Package'}
+        </motion.button>
+      </div>
+
+      {/* ── Full-screen prototype modal (outside scrollable div to avoid clipping) ── */}
+      <AnimatePresence>
+        {previewExpanded && htmlPrototype && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 z-50 flex flex-col"
+            style={{ background: '#fff', borderRadius: 'inherit' }}
+          >
+            {/* Modal toolbar */}
+            <div
+              className="shrink-0 flex items-center justify-between px-4 py-2.5"
+              style={{ borderBottom: '1px solid #f0f0f0' }}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-4 rounded-full" style={{ background: '#7EACEA' }} />
+                <span style={{ fontSize: 9, color: '#aaa', fontFamily: 'ui-monospace, monospace', letterSpacing: '0.08em' }}>
+                  LIVE PROTOTYPE
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExportProto}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
+                  style={{ background: '#f4f5f7', border: 'none', cursor: 'pointer', fontSize: 9, color: '#6b7280', fontWeight: 600 }}
+                >
+                  <Download size={9} />
+                  Export HTML
+                </button>
+                <button
+                  onClick={() => setPreviewExpanded(false)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
+                  style={{ background: '#18181b', border: 'none', cursor: 'pointer', fontSize: 9, color: '#fff', fontWeight: 600 }}
+                >
+                  <X size={9} />
+                  Close
+                </button>
+              </div>
+            </div>
+            {/* Full iframe */}
+            <div className="flex-1 overflow-hidden relative">
+              <iframe
+                srcDoc={htmlPrototype}
+                className="absolute inset-0 w-full h-full border-0"
+                sandbox="allow-scripts allow-same-origin"
+                title="Prototype (expanded)"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

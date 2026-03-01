@@ -71,25 +71,42 @@ Return a JSON object with these keys:
             user=core_prompt,
             emit=emit,
             activity_prefix="Defining tokens",
-            max_tokens=2048,
+            max_tokens=3072,
         )
 
         try:
-            core_tokens = json.loads(core_raw)
-        except json.JSONDecodeError:
+            core_tokens = json.loads(self.clean_json(core_raw))
+            if not isinstance(core_tokens, dict):
+                core_tokens = {}
+        except Exception as e:
+            print(f"[Visual core_tokens JSON error] {e} | first 300: {core_raw[:300]}")
             core_tokens = {}
 
-        color_count = len(core_tokens.get("color", {}).get("semantic", {}))
+        def _dg(obj: object, *keys, default=None):
+            """Safe nested dict accessor — tolerates non-dict intermediate values."""
+            for key in keys:
+                if not isinstance(obj, dict):
+                    return default
+                obj = obj.get(key, default)
+            return obj
+
+        color_obj = _dg(core_tokens, 'color', 'semantic', default={}) or {}
+        color_count = len(color_obj)
+        print(f"[Visual] core_tokens top_keys={list(core_tokens.keys())} | color_count={color_count}")
         self.emit_activity(emit, f"Core tokens ready: {color_count} semantic colors, type scale, spacing.", "success")
         self.emit_status(emit, "working", "Core tokens done — awaiting Manager review", 0.35)
 
         # ── Milestone 1: core tokens review ───────────────────────────────────
         feedback_1 = ""
         if on_milestone:
+            font_sizes = _dg(core_tokens, 'typography', 'fontSize', default={}) or {}
+            spacing_base = _dg(core_tokens, 'spacing', 'base', default='4px') or '4px'
+            if not isinstance(spacing_base, str):
+                spacing_base = '4px'
             summary = (
                 f"{color_count} semantic color tokens, "
-                f"typography scale with {len(core_tokens.get('typography', {}).get('fontSize', {}))} sizes, "
-                f"spacing scale based on {core_tokens.get('spacing', {}).get('base', '4px')} base."
+                f"typography scale with {len(font_sizes)} sizes, "
+                f"spacing scale based on {spacing_base} base."
             )
             feedback_1 = await on_milestone("core_tokens", summary)
             if feedback_1:
@@ -144,12 +161,17 @@ Return a JSON object:
             user=specs_prompt,
             emit=emit,
             activity_prefix="Building specs",
-            max_tokens=2048,
+            max_tokens=3072,
         )
 
         try:
-            specs_data = json.loads(specs_raw)
-        except json.JSONDecodeError:
+            specs_data = json.loads(self.clean_json(specs_raw))
+            if not isinstance(specs_data, dict):
+                specs_data = {}
+        except Exception as e:
+            print(f"[Visual specs_data JSON error] {e} | first 300: {specs_raw[:300]}")
+            specs_data = {}
+        if not specs_data:
             specs_data = {"elevation": {}, "border": {}, "motion": {}, "component_styles": {}, "figma_specs": {}}
 
         comp_count = len(specs_data.get("component_styles", {}))
@@ -158,10 +180,13 @@ Return a JSON object:
 
         # ── Milestone 2: full system review ───────────────────────────────────
         if on_milestone:
+            motion_val = specs_data.get('motion', {})
+            motion_durations = len(motion_val.get('duration', {})) if isinstance(motion_val, dict) else 0
+            elevation_count = len(specs_data.get('elevation', {}))
             summary = (
                 f"{comp_count} component styles, Figma specs, "
-                f"motion tokens ({len(specs_data.get('motion', {}).get('duration', {}))} durations), "
-                f"elevation scale ({len(specs_data.get('elevation', {}))} levels)."
+                f"motion tokens ({motion_durations} durations), "
+                f"elevation scale ({elevation_count} levels)."
             )
             await on_milestone("design_system_complete", summary)
 
@@ -176,7 +201,6 @@ Return a JSON object:
             "component_styles": specs_data.get("component_styles", {}),
             "figma_specs": specs_data.get("figma_specs", {}),
         }
-
         self.emit_status(emit, "complete", "Design system complete", 1.0, False)
         self.emit_activity(emit, "Full design token set and Figma specs delivered.", "success")
 

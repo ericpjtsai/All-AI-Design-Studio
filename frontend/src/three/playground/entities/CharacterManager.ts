@@ -522,13 +522,15 @@ export class CharacterManager {
     }
     if (this.agentStateBuffer) {
       if (isSpeaking) {
+        // Switch to TALK unless the NPC is mid-walk (GOTO) — don't interrupt pathfinding
         const currentState = this.agentStateBuffer.getState(index);
-        if (currentState !== AgentBehavior.GOTO && currentState !== AgentBehavior.BOIDS) {
+        if (currentState !== AgentBehavior.GOTO) {
           this.agentStateBuffer.setState(index, AgentBehavior.TALK);
         }
       } else {
+        // Return to wandering if we were the ones who set TALK
         if (this.agentStateBuffer.getState(index) === AgentBehavior.TALK) {
-          this.agentStateBuffer.setState(index, AgentBehavior.FROZEN);
+          this.agentStateBuffer.setState(index, AgentBehavior.BOIDS);
         }
       }
     }

@@ -48,3 +48,17 @@ def should_checkpoint_2(state: DesignTeamState) -> str:
     if not has_critical and confidence >= threshold:
         return "senior_review"  # self-approve
     return "checkpoint_2"
+
+
+def after_checkpoint_1(state: DesignTeamState) -> str:
+    """After checkpoint_1: re-run Senior+Visual if human requested revisions."""
+    if state.get("human_action") == "revise":
+        return "revision_1"
+    return "implementing"
+
+
+def after_checkpoint_2(state: DesignTeamState) -> str:
+    """After checkpoint_2: re-run Junior if human requested revisions."""
+    if state.get("human_action") == "revise":
+        return "revision_2"
+    return "senior_review"

@@ -54,7 +54,7 @@ const RightPanel: React.FC = () => {
 
   return (
     <div
-      className="flex-1 flex flex-col bg-white overflow-hidden min-w-0 relative"
+      className="w-[420px] shrink-0 flex flex-col bg-white overflow-hidden relative"
       style={{
         borderRadius: 32,
         border: '1px solid rgba(0,0,0,0.05)',

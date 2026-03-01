@@ -27,7 +27,7 @@ const PlaygroundPanel: React.FC = () => {
 
   return (
     <div
-      className="w-[480px] h-full shrink-0 relative overflow-hidden bg-white"
+      className="flex-1 h-full relative overflow-hidden bg-white"
       style={{
         borderRadius: 32,
         border: '1px solid rgba(0,0,0,0.05)',

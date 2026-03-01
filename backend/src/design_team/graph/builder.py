@@ -33,6 +33,8 @@ def build_graph() -> StateGraph:
     graph.add_node("senior_review", nodes.senior_review_node)
     graph.add_node("reviewing", nodes.reviewing_node)
     graph.add_node("final_checkpoint", nodes.final_checkpoint_node)
+    graph.add_node("revision_1", nodes.revision_1_node)
+    graph.add_node("revision_2", nodes.revision_2_node)
     graph.add_node("complete", nodes.complete_node)
 
     # ── Wire edges ───────────────────────────────────────────────────────────
@@ -54,14 +56,24 @@ def build_graph() -> StateGraph:
         "checkpoint_1": "checkpoint_1",
         "implementing": "implementing",
     })
-    graph.add_edge("checkpoint_1", "implementing")
+    # checkpoint_1: confirm → implementing, revise → revision_1 → re-cross-critique
+    graph.add_conditional_edges("checkpoint_1", edges.after_checkpoint_1, {
+        "revision_1": "revision_1",
+        "implementing": "implementing",
+    })
+    graph.add_edge("revision_1", "cross_critique")
 
     # Phase 2: Implementing → adaptive checkpoint → senior review
     graph.add_conditional_edges("implementing", edges.should_checkpoint_2, {
         "checkpoint_2": "checkpoint_2",
         "senior_review": "senior_review",
     })
-    graph.add_edge("checkpoint_2", "senior_review")
+    # checkpoint_2: confirm → senior_review, revise → revision_2 → back to checkpoint_2
+    graph.add_conditional_edges("checkpoint_2", edges.after_checkpoint_2, {
+        "revision_2": "revision_2",
+        "senior_review": "senior_review",
+    })
+    graph.add_edge("revision_2", "checkpoint_2")
 
     # Phase 3: Final review (always requires human)
     graph.add_edge("senior_review", "reviewing")

@@ -363,6 +363,107 @@ async def checkpoint_2_node(state: DesignTeamState, config: RunnableConfig) -> d
     return result
 
 
+# ── Phase 1 revision: Re-run Senior + Visual ─────────────────────────────────
+
+async def revision_1_node(state: DesignTeamState, config: RunnableConfig) -> dict:
+    """Re-run Senior Designer and Visual Designer with human revision feedback."""
+    manager, senior, visual, _ = _get_agents()
+    emit = get_emit_from_config(config)
+    emit("phase_change", {"phase": "designing"})
+
+    scope_doc = state["scope_doc"]
+    direction_brief = state.get("direction_brief", {})
+    human_feedback = state.get("human_feedback", "")
+    milestone_flags: list[dict] = []
+
+    # Inject revision notes into scope context
+    revised_scope = dict(scope_doc)
+    if human_feedback:
+        revised_scope["revision_notes"] = f"Revision directive from human: {human_feedback}"
+        emit("activity", {
+            "agentIndex": 0,
+            "message": f"Revision directive received. Briefing team: {human_feedback[:100]}",
+            "level": "info",
+        })
+
+    async def senior_milestone(name: str, summary: str) -> str:
+        review = await manager.review_milestone("Senior Designer", name, summary, scope_doc, emit)
+        if review.get("needs_human"):
+            milestone_flags.append({"reason": review.get("reason", ""), "critical": False})
+        return review.get("feedback", "")
+
+    async def visual_milestone(name: str, summary: str) -> str:
+        review = await manager.review_milestone("Visual Designer", name, summary, scope_doc, emit)
+        if review.get("needs_human"):
+            milestone_flags.append({"reason": review.get("reason", ""), "critical": False})
+        return review.get("feedback", "")
+
+    senior_out, visual_out = await asyncio.gather(
+        senior.run(revised_scope, direction_brief, emit, on_milestone=senior_milestone),
+        visual.run(revised_scope, emit, on_milestone=visual_milestone),
+    )
+
+    emit("design_output", {"output_type": "senior_output", "data": senior_out})
+    emit("design_output", {"output_type": "visual_output", "data": visual_out})
+
+    return {
+        "senior_output": senior_out,
+        "visual_output": visual_out,
+        "milestone_flags": milestone_flags,
+        "human_action": None,  # clear so routing doesn't loop
+    }
+
+
+# ── Phase 2 revision: Re-run Junior ──────────────────────────────────────────
+
+async def revision_2_node(state: DesignTeamState, config: RunnableConfig) -> dict:
+    """Re-run Junior Designer with human revision feedback."""
+    manager, _, _, junior = _get_agents()
+    emit = get_emit_from_config(config)
+    emit("phase_change", {"phase": "implementing"})
+
+    scope_doc = state["scope_doc"]
+    human_feedback = state.get("human_feedback", "")
+    milestone_flags: list[dict] = []
+
+    cross = state.get("cross_critique_result", {})
+    cross_notes = cross.get("junior_notes", "")
+    if human_feedback:
+        cross_notes = f"Human revision feedback: {human_feedback}\n{cross_notes}"
+        emit("activity", {
+            "agentIndex": 0,
+            "message": f"Revision directive: {human_feedback[:100]}",
+            "level": "info",
+        })
+
+    async def junior_milestone(name: str, summary: str) -> str:
+        review = await manager.review_milestone("Junior Designer", name, summary, scope_doc, emit)
+        if review.get("needs_human"):
+            milestone_flags.append({
+                "reason": review.get("reason", ""),
+                "critical": review.get("score", 10) < 5,
+            })
+        return review.get("feedback", "")
+
+    opt_prep = state.get("optimization_prep", {})
+    junior_addendum = opt_prep.get("junior_brief_addendum", "")
+
+    junior_out = await junior.run(
+        scope_doc, state["senior_output"], state["visual_output"], emit,
+        manager_addendum=junior_addendum,
+        cross_critique_notes=cross_notes,
+        on_milestone=junior_milestone,
+    )
+
+    emit("design_output", {"output_type": "junior_output", "data": junior_out})
+
+    return {
+        "junior_output": junior_out,
+        "milestone_flags": milestone_flags,
+        "human_action": None,  # clear so routing doesn't loop
+    }
+
+
 # ── Phase 2b: Senior reviews implementation ──────────────────────────────────
 
 async def senior_review_node(state: DesignTeamState, config: RunnableConfig) -> dict:

@@ -76,9 +76,16 @@ const ThinkingDots: React.FC = () => (
 
 const NormalChatPanel: React.FC<{ agent: typeof AGENTS[0] }> = ({ agent }) => {
   const { chatMessages, sendMessage, isThinking, setIsTyping } = usePlaygroundStore();
+  const pendingConfirmation = useStore((s) => s.pendingConfirmation);
+  const confirmDecision = useStore((s) => s.confirmDecision);
   const [input, setInput] = useState('');
+  const [lastUserText, setLastUserText] = useState('');
+  const [directiveApplied, setDirectiveApplied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stopTypingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset directive state when checkpoint changes
+  useEffect(() => { setDirectiveApplied(false); }, [pendingConfirmation?.id]);
 
   useEffect(() => () => { if (stopTypingRef.current) clearTimeout(stopTypingRef.current); }, []);
   useEffect(() => {
@@ -91,8 +98,25 @@ const NormalChatPanel: React.FC<{ agent: typeof AGENTS[0] }> = ({ agent }) => {
     setIsTyping(false);
     const text = input;
     setInput('');
+    setLastUserText(text);
     await sendMessage(text);
   };
+
+  const handleApplyDirective = () => {
+    if (!pendingConfirmation || !lastUserText) return;
+    setDirectiveApplied(true);
+    confirmDecision(pendingConfirmation.id, 'revise', lastUserText);
+  };
+
+  // Show "Apply as Directive" when: at a checkpoint, user sent a message, agent replied
+  const lastMsg = chatMessages[chatMessages.length - 1];
+  const showDirectiveBanner = (
+    !!pendingConfirmation &&
+    !!lastUserText &&
+    !directiveApplied &&
+    !isThinking &&
+    lastMsg?.role === 'model'
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -158,6 +182,33 @@ const NormalChatPanel: React.FC<{ agent: typeof AGENTS[0] }> = ({ agent }) => {
           </motion.div>
         )}
       </div>
+
+      {/* Apply as Directive banner */}
+      <AnimatePresence>
+        {showDirectiveBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            className="mx-4 mb-2 rounded-xl overflow-hidden border"
+            style={{ borderColor: `${agent.color}40`, background: `${agent.color}08` }}
+          >
+            <div className="px-3 py-2 flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full animate-pulse shrink-0" style={{ background: agent.color }} />
+              <p className="text-[10px] font-bold text-zinc-600 flex-1 leading-snug">
+                Apply your message as a revision directive?
+              </p>
+              <button
+                onClick={handleApplyDirective}
+                className="text-[10px] font-black px-2.5 py-1 rounded-lg shrink-0 transition-all active:scale-95 hover:brightness-90"
+                style={{ background: agent.color, color: 'white' }}
+              >
+                Apply →
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="p-4 border-t border-zinc-50">
         <div className="flex items-center gap-2">

@@ -142,6 +142,21 @@ async def chat_with_agent(session_id: str, body: ChatRequest):
             ),
         )
         reply = response.text or "I'm not sure how to respond to that."
+        # Some agent prompts instruct JSON output; extract plain text if wrapped.
+        _stripped = reply.strip()
+        if _stripped.startswith("{"):
+            try:
+                _parsed = json.loads(_stripped)
+                if isinstance(_parsed, dict):
+                    reply = (
+                        _parsed.get("response")
+                        or _parsed.get("reply")
+                        or _parsed.get("text")
+                        or _parsed.get("message")
+                        or reply
+                    )
+            except json.JSONDecodeError:
+                pass
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"LLM error: {exc}")
 

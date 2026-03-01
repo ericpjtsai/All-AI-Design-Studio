@@ -62,12 +62,17 @@ export interface CharacterState {
   setDebugStates: (states: Float32Array) => void;
   setActiveEncounter: (encounter: ActiveEncounter | null) => void;
   setSelectedNpc: (index: number | null) => void;
+  npcScreenPositions: Record<number, { x: number; y: number } | null>;
+  setNpcScreenPositions: (positions: Record<number, { x: number; y: number } | null>) => void;
   setSelectedPosition: (pos: { x: number; y: number } | null) => void;
   setHoveredNpc: (index: number | null, pos: { x: number; y: number } | null) => void;
   startChat: (index: number) => void;
   endChat: () => void;
   sendMessage: (text: string) => Promise<void>;
   updatePerformance: (stats: PerformanceStats) => void;
+
+  workflowEvent: WorkflowEvent | null;
+  triggerWorkflowEvent: (event: WorkflowEvent | null) => void;
 }
 
 export enum AnimationName {
@@ -89,6 +94,20 @@ export interface ActiveEncounter {
   npcRole: string;
   npcMission: string;
   npcPersonality: string;
+}
+
+// ── Workflow event (spatial interaction triggers) ──────────────────────────────
+
+export type AgentRole = 'manager' | 'senior' | 'junior' | 'visual';
+export type WorkflowActionType = 'working' | 'passing_data' | 'reviewing' | 'idle';
+
+export interface WorkflowEvent {
+  /** Playground NPC index (1–4) of the initiating agent. */
+  sourceNpcIdx: number;
+  /** Playground NPC index of the recipient, or null when agent acts alone. */
+  targetNpcIdx: number | null;
+  actionType: WorkflowActionType;
+  taskDescription: string;
 }
 
 export type ExpressionKey = 'idle' | 'listening' | 'neutral' | 'surprised' | 'happy' | 'sick' | 'wink' | 'doubtful' | 'sad';

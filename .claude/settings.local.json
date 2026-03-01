@@ -34,7 +34,8 @@
       "Bash(python3 -c \"from design_team.api.chat import router; print\\(''Chat router OK:'', [r.path for r in router.routes]\\)\")",
       "Bash(uv run python -c \"from design_team.api.chat import router; print\\(''Chat router OK:'', [r.path for r in router.routes]\\)\")",
       "Bash(uv run python -c \"from design_team.main import app; routes = [r.path for r in app.routes]; print\\(''All routes:'', routes\\)\")",
-      "Bash(uv run python -c \"from design_team.main import app; routes = [r.path for r in app.routes]; print\\(''Routes:'', routes\\); print\\(''Total:'', len\\(routes\\)\\)\")"
+      "Bash(uv run python -c \"from design_team.main import app; routes = [r.path for r in app.routes]; print\\(''Routes:'', routes\\); print\\(''Total:'', len\\(routes\\)\\)\")",
+      "Bash(git -C /Users/chuang/Desktop/All-AI-Design-Studio log --oneline --all)"
     ]
   }
 }

@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import { CharacterState, AnimationName, PerformanceStats, BoidsParams, ActiveEncounter } from './types';
+import { CharacterState, AnimationName, PerformanceStats, BoidsParams, ActiveEncounter, WorkflowEvent } from './types';
 
 export const usePlaygroundStore = create<CharacterState>()(
   (set) => ({
@@ -40,6 +40,8 @@ export const usePlaygroundStore = create<CharacterState>()(
     },
 
     lastSpeakingTrigger: null,
+    npcScreenPositions: {},
+    workflowEvent: null,
 
     setAnimation: (name: string) => set({ currentAction: name }),
     setSpeaking: (index: number, isSpeaking: boolean) => set({
@@ -60,6 +62,7 @@ export const usePlaygroundStore = create<CharacterState>()(
     setDebugStates: (states: Float32Array) => set({ debugStates: states }),
     setActiveEncounter: (encounter: ActiveEncounter | null) => set({ activeEncounter: encounter }),
     setSelectedNpc: (index: number | null) => set({ selectedNpcIndex: index, selectedPosition: null }),
+    setNpcScreenPositions: (positions) => set({ npcScreenPositions: positions }),
     setSelectedPosition: (pos: { x: number; y: number } | null) => set({ selectedPosition: pos }),
     setHoveredNpc: (index: number | null, pos: { x: number; y: number } | null) => set({ hoveredNpcIndex: index, hoverPosition: pos }),
     startChat: () => {},
@@ -67,5 +70,6 @@ export const usePlaygroundStore = create<CharacterState>()(
     sendMessage: async () => {},
 
     updatePerformance: (performance: PerformanceStats) => set({ performance }),
+    triggerWorkflowEvent: (event: WorkflowEvent | null) => set({ workflowEvent: event }),
   })
 );

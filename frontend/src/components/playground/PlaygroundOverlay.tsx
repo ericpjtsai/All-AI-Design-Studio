@@ -18,6 +18,7 @@ const PlaygroundOverlay: React.FC = () => {
     selectedPosition,
     hoveredNpcIndex,
     hoverPosition,
+    npcScreenPositions,
     startChat,
     endChat,
     isChatting,
@@ -33,6 +34,7 @@ const PlaygroundOverlay: React.FC = () => {
   const sessionId = useStore((s) => s.sessionId);
   const sessionError = useStore((s) => s.sessionError);
   const agentTrust = useStore((s) => s.agentTrust);
+  const agentStates = useStore((s) => s.agentStates);
   const resetSession = useStore((s) => s.resetSession);
   const setAgentTrust = useStore((s) => s.setAgentTrust);
 
@@ -92,6 +94,138 @@ const PlaygroundOverlay: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ─── Agent status badges (all NPCs, always visible) ─── */}
+      {[1, 2, 3, 4].map((npcIdx) => {
+        const pos        = npcScreenPositions[npcIdx];
+        const agentState = agentStates.find((s) => s.index === npcIdx - 1);
+        const playAgent  = AGENTS[npcIdx];
+        if (!pos || !agentState || !playAgent) return null;
+
+        const isActive   = agentState.status === 'working' || agentState.status === 'reviewing';
+        const isDone     = agentState.status === 'complete' || agentState.status === 'done';
+        const isIdle     = !isActive && !isDone;
+        const task       = agentState.currentTask ? agentState.currentTask.slice(0, 34) : '';
+        const progress   = agentState.progress ?? 0;
+
+        const statusLabel =
+          agentState.status === 'reviewing' ? 'Review' :
+          agentState.status === 'working'   ? 'Working' :
+          agentState.status === 'complete' || agentState.status === 'done' ? 'Done' :
+          agentState.status === 'waiting'   ? 'Waiting' : 'Standby';
+
+        const borderColor = isActive ? `${playAgent.color}60` : isDone ? `${playAgent.color}28` : 'rgba(255,255,255,0.08)';
+        const bgColor     = isActive ? 'rgba(9,9,11,0.92)' : 'rgba(9,9,11,0.72)';
+        const nameOpacity = isActive ? 1 : isDone ? 0.65 : 0.38;
+
+        return (
+          <div
+            key={npcIdx}
+            className="absolute z-20 pointer-events-none"
+            style={{
+              left: pos.x,
+              top: pos.y,
+              transform: 'translate(-50%, -100%) translateY(-14px)',
+              transition: 'opacity 0.4s',
+            }}
+          >
+            <div className="flex flex-col items-center gap-0">
+              {/* Badge card */}
+              <div
+                className="backdrop-blur-md rounded-xl border shadow-2xl"
+                style={{
+                  background: bgColor,
+                  borderColor,
+                  boxShadow: isActive
+                    ? `0 0 18px 2px ${playAgent.color}22, 0 4px 20px rgba(0,0,0,0.5)`
+                    : '0 4px 16px rgba(0,0,0,0.35)',
+                  padding: isActive ? '7px 10px 6px' : '5px 9px',
+                }}
+              >
+                {/* Name row */}
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
+                  {/* Status dot */}
+                  <div
+                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${isActive ? 'animate-pulse' : ''}`}
+                    style={{
+                      background: isActive
+                        ? (agentState.status === 'reviewing' ? '#f59e0b' : '#22c55e')
+                        : isDone ? '#7EACEA' : 'rgba(255,255,255,0.18)',
+                    }}
+                  />
+                  {/* Name */}
+                  <span
+                    className="text-[9px] font-black uppercase tracking-widest"
+                    style={{ color: isActive ? playAgent.color : `rgba(255,255,255,${nameOpacity})` }}
+                  >
+                    {playAgent.role.replace(' Designer', '').replace(' Manager', ' Mgr')}
+                  </span>
+                  {/* Status pill */}
+                  <span
+                    className="text-[7px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+                    style={{
+                      background: isActive
+                        ? `${playAgent.color}22`
+                        : isDone ? '#7EACEA18' : 'rgba(255,255,255,0.06)',
+                      color: isActive
+                        ? playAgent.color
+                        : isDone ? '#7EACEA' : 'rgba(255,255,255,0.28)',
+                    }}
+                  >
+                    {statusLabel}
+                  </span>
+                </div>
+
+                {/* Current task (only for active) */}
+                {isActive && task && (
+                  <p
+                    className="text-[8px] leading-snug mt-1 max-w-[148px] truncate"
+                    style={{ color: 'rgba(255,255,255,0.50)' }}
+                  >
+                    {task}
+                  </p>
+                )}
+
+                {/* Progress bar (only for active with progress) */}
+                {isActive && progress > 0 && (
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <div
+                      className="flex-1 h-0.5 rounded-full overflow-hidden"
+                      style={{ background: `${playAgent.color}20`, minWidth: 80 }}
+                    >
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${progress}%`,
+                          background: playAgent.color,
+                          transition: 'width 0.6s ease-out',
+                        }}
+                      />
+                    </div>
+                    <span
+                      className="text-[7px] font-black tabular-nums shrink-0"
+                      style={{ color: `${playAgent.color}90` }}
+                    >
+                      {progress}%
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Downward pointer triangle */}
+              <div
+                className="w-0 h-0"
+                style={{
+                  borderLeft: '4px solid transparent',
+                  borderRight: '4px solid transparent',
+                  borderTop: `5px solid ${isActive ? borderColor : 'rgba(255,255,255,0.08)'}`,
+                  opacity: isIdle ? 0.4 : 1,
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
 
       {/* ─── Top bar ─── */}
       <div className="absolute top-3 left-3 right-3 flex justify-between items-start pointer-events-auto">
@@ -320,16 +454,6 @@ const PlaygroundOverlay: React.FC = () => {
         </div>
       )}
 
-      {/* ─── Controls hint ─── */}
-      <div className="absolute bottom-3 right-3 pointer-events-none">
-        <div className="bg-white/60 backdrop-blur-sm border border-black/5 rounded-xl px-2.5 py-2 text-[8px] text-zinc-400 font-medium leading-relaxed">
-          <p className="font-black text-zinc-500 uppercase tracking-widest mb-0.5 text-[7px]">Controls</p>
-          <p>Click floor → move</p>
-          <p>Click agent → select</p>
-          <p>Drag → orbit</p>
-          <p>Scroll → zoom</p>
-        </div>
-      </div>
     </div>
   );
 };
